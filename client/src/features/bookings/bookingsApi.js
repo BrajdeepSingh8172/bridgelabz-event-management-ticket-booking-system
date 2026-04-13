@@ -17,18 +17,22 @@ export const bookingsApi = createApi({
   endpoints: (build) => ({
     createBooking: build.mutation({
       query: (body) => ({ url: '/', method: 'POST', body }),
+      transformResponse: (res) => res.data || res,
       invalidatesTags: ['Booking'],
     }),
     getUserBookings: build.query({
       query: () => '/my',
+      transformResponse: (res) => res.data || res,
       providesTags: ['Booking'],
     }),
     getBookingById: build.query({
       query: (id) => `/${id}`,
+      transformResponse: (res) => res.data || res,
       providesTags: (_r, _e, id) => [{ type: 'Booking', id }],
     }),
     cancelBooking: build.mutation({
       query: (id) => ({ url: `/${id}/cancel`, method: 'PATCH' }),
+      transformResponse: (res) => res.data || res,
       invalidatesTags: ['Booking'],
     }),
   }),

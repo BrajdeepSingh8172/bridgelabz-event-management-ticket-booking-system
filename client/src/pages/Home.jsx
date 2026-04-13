@@ -13,7 +13,7 @@ const STATS = [
 
 export default function Home() {
   const { data, isLoading, error } = useGetFeaturedEventsQuery();
-  const featured = Array.isArray(data) ? data : data?.events ?? [];
+  const featured = Array.isArray(data) ? data : (data?.events ?? []);
 
   return (
     <div className="min-h-screen">

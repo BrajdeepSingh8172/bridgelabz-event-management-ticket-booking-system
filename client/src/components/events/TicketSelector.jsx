@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 
@@ -7,14 +7,21 @@ export default function TicketSelector({ ticketTypes = [], onChange }) {
     () => Object.fromEntries(ticketTypes.map((t) => [t._id, 0])),
   );
 
+  // Fire onChange whenever selections change — useEffect avoids the
+  // "cannot update during render" warning while keeping parent in sync.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    onChange?.(selections);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selections]);
+
   const update = (id, delta) => {
     setSelections((prev) => {
       const ticket    = ticketTypes.find((t) => t._id === id);
       const remaining = (ticket?.totalQuantity ?? 0) - (ticket?.soldQuantity ?? 0);
       const next      = Math.max(0, Math.min((prev[id] ?? 0) + delta, remaining, 10));
-      const updated   = { ...prev, [id]: next };
-      onChange?.(updated);
-      return updated;
+      return { ...prev, [id]: next };
     });
   };
 

@@ -29,7 +29,12 @@ export default function CreateEvent() {
 
       const result = await createEvent(formData).unwrap();
       toast.success('Event created! 🎉');
-      navigate(`/dashboard/events/${result?._id || result?.data?._id || result?.event?._id}/tickets`);
+      // result is the event object directly (transformResponse already unwrapped ApiResponse.data)
+      const eventId = result?._id ?? result?.id;
+      navigate(eventId
+        ? `/dashboard/events/${eventId}/tickets`
+        : '/dashboard/events'
+      );
     } catch (err) {
       toast.error(err?.data?.message ?? 'Failed to create event.');
     }

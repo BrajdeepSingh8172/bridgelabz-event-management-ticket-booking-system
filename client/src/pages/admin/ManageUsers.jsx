@@ -11,7 +11,9 @@ export default function ManageUsers() {
   const fetchUsers = async () => {
     try {
       const { data } = await axiosClient.get('/api/users');
-      setUsers(data?.users ?? data);
+      // ApiResponse shape: { success, data: { users, pagination }, message }
+      const raw = data?.data ?? data;
+      setUsers(raw?.users ?? (Array.isArray(raw) ? raw : []));
     } catch (err) {
       toast.error('Failed to load users');
     } finally {
@@ -68,7 +70,7 @@ export default function ManageUsers() {
                     value={u.role}
                     onChange={(e) => handleRoleChange(u._id, e.target.value)}
                   >
-                    <option value="user">User</option>
+                    <option value="attendee">Attendee</option>
                     <option value="organizer">Organizer</option>
                     <option value="admin">Admin</option>
                   </select>

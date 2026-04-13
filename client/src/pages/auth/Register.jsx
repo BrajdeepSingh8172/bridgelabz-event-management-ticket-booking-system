@@ -29,7 +29,16 @@ export default function Register() {
   const onSubmit = async (values) => {
     try {
       const data = await registerApi(values).unwrap();
-      dispatch(setCredentials({ accessToken: data.accessToken, user: data.user }));
+      // data is now { user, accessToken } (ApiResponse.data unwrapped)
+      const rawUser = data.user ?? data;
+      const user = {
+        id:     rawUser._id ?? rawUser.id,
+        name:   rawUser.name,
+        email:  rawUser.email,
+        role:   rawUser.role,
+        avatar: rawUser.avatar ?? null,
+      };
+      dispatch(setCredentials({ accessToken: data.accessToken, user }));
       toast.success('Account created! Welcome to EventHub 🎉');
       navigate('/', { replace: true });
     } catch (err) {

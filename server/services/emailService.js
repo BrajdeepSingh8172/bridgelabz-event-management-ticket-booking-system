@@ -70,7 +70,7 @@ const sendBookingConfirmation = async ({
       <div class="detail"><span>Total Paid</span><span>₹${totalAmount.toLocaleString('en-IN')}</span></div>
 
       <div class="qr">
-        <img src="${qrCode}" alt="QR Code" />
+        <img src="cid:qr_code_image" alt="QR Code" />
         <p>Show this QR at the venue entrance</p>
       </div>
     </div>
@@ -81,12 +81,24 @@ const sendBookingConfirmation = async ({
 </body>
 </html>`;
 
-  await transporter.sendMail({
+  const mailOptions = {
     from: process.env.EMAIL_FROM,
     to,
     subject: `Booking Confirmed – ${eventTitle} (#${bookingRef})`,
     html,
-  });
+  };
+
+  if (qrCode) {
+    mailOptions.attachments = [
+      {
+        filename: 'qrcode.png',
+        path: qrCode, // Nodemailer happily accepts Data URLs in the path property
+        cid: 'qr_code_image', // matches the cid: in the html img src
+      },
+    ];
+  }
+
+  await transporter.sendMail(mailOptions);
 };
 
 /**

@@ -33,7 +33,16 @@ export default function Profile() {
     setSaving(true);
     try {
       const { data } = await axiosClient.patch('/api/users/profile', values);
-      dispatch(setCredentials({ user: data.user ?? data }));
+      // axiosClient returns raw axios response; data is ApiResponse { success, data: <user>, message }
+      const raw = data?.data ?? data?.user ?? data;
+      const updatedUser = {
+        id:     raw._id ?? raw.id,
+        name:   raw.name,
+        email:  raw.email,
+        role:   raw.role,
+        avatar: raw.avatar ?? null,
+      };
+      dispatch(setCredentials({ user: updatedUser }));
       toast.success('Profile updated!');
     } catch {
       toast.error('Failed to update profile.');

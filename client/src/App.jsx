@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
+import { useSessionRestore } from './hooks/useSessionRestore';
 import MainLayout       from './layouts/MainLayout';
 import DashboardLayout  from './layouts/DashboardLayout';
 import AdminLayout      from './layouts/AdminLayout';
@@ -29,6 +30,7 @@ import ManageUsers      from './pages/admin/ManageUsers';
 import ManageEvents     from './pages/admin/ManageEvents';
 
 export default function App() {
+  useSessionRestore(); // Silently restore user from token on page reload
   return (
     <Routes>
       {/* ── Public Routes (MainLayout) ───────────────────────── */}

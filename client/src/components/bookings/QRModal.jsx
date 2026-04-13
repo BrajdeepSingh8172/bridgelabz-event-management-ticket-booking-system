@@ -11,7 +11,7 @@ export default function QRModal({ isOpen, onClose, booking }) {
     bookingId:  booking?._id,
     ref:        booking?.bookingRef,
     event:      booking?.event?.title,
-    attendee:   booking?.attendeeName,
+    attendee:   booking?.attendeeInfo?.name ?? booking?.attendeeName ?? '',
   });
 
   const downloadQR = () => {

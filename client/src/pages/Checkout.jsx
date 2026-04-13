@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +19,15 @@ export default function Checkout() {
   const { user }     = useAuth();
   const selections   = state?.selections ?? {};
 
+  // Guard: if no selections, redirect back to the event
+  useEffect(() => {
+    const hasAny = Object.values(selections).some((q) => q > 0);
+    if (!hasAny) {
+      navigate(`/events/${eventId}`, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data: event, isLoading } = useGetEventByIdQuery(eventId);
   const [createOrder,  { isLoading: ordering  }] = useCreateOrderMutation();
   const [verifyPayment, { isLoading: verifying }] = useVerifyPaymentMutation();
@@ -31,7 +41,7 @@ export default function Checkout() {
     },
   });
 
-  const tickets = event?.ticketTypes ?? [];
+  const tickets   = event?.ticketTypes ?? [];
   const lineItems = tickets
     .filter((t) => (selections[t._id] ?? 0) > 0)
     .map((t) => ({ ...t, qty: selections[t._id] }));
@@ -53,47 +63,69 @@ export default function Checkout() {
       return;
     }
     try {
-      const loaded = await loadRazorpay();
-      if (!loaded) { toast.error('Payment gateway unavailable.'); return; }
-
+      // Step 1: Create booking + Razorpay order
       const orderData = await createOrder({
         eventId,
-        tickets: lineItems.map((t) => ({ ticketTypeId: t._id, quantity: t.qty })),
+        tickets: lineItems.map((t) => ({ ticketId: t._id, quantity: t.qty })),
         attendee: formValues,
       }).unwrap();
 
+      // Step 2a: Free event — booking confirmed on server
+      if (orderData.isFree) {
+        toast.success('Free booking confirmed! 🎉');
+        navigate('/payment-success', {
+          state: { bookingId: orderData.bookingId },
+          replace: true,
+        });
+        return;
+      }
+
+      // Step 2b: Paid — open Razorpay
+      const loaded = await loadRazorpay();
+      if (!loaded) { toast.error('Payment gateway could not load. Check your connection.'); return; }
+
       const options = {
-        key:          import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount:       orderData.amount,
-        currency:     orderData.currency ?? 'INR',
-        name:         'EventHub',
-        description:  event?.title,
-        order_id:     orderData.orderId,
+        key:         import.meta.env.VITE_RAZORPAY_KEY_ID || orderData.keyId,
+        amount:      orderData.amount,
+        currency:    orderData.currency ?? 'INR',
+        name:        'EventHub',
+        description: event?.title,
+        order_id:    orderData.orderId,
         prefill: {
-          name:  formValues.attendeeName,
-          email: formValues.attendeeEmail,
-          contact: formValues.attendeePhone,
+          name:    formValues.attendeeName,
+          email:   formValues.attendeeEmail,
+          contact: formValues.attendeePhone ?? '',
         },
         theme: { color: '#6366f1' },
         handler: async (response) => {
           try {
-            const result = await verifyPayment({
+            await verifyPayment({
               razorpay_order_id:   response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature:  response.razorpay_signature,
               bookingId:           orderData.bookingId,
             }).unwrap();
             toast.success('Payment successful! 🎉');
-            navigate('/payment-success', { state: { bookingId: result.bookingId ?? orderData.bookingId }, replace: true });
-          } catch {
-            toast.error('Payment verification failed.');
+            navigate('/payment-success', {
+              state: { bookingId: orderData.bookingId },
+              replace: true,
+            });
+          } catch (verifyErr) {
+            toast.error(
+              verifyErr?.data?.message ??
+              'Payment verification failed. Please contact support.'
+            );
           }
+        },
+        modal: {
+          ondismiss: () => toast('Payment cancelled. Your booking is held for 15 minutes.', { icon: 'ℹ️' }),
         },
       };
 
       new window.Razorpay(options).open();
     } catch (err) {
-      toast.error(err?.data?.message ?? 'Could not initiate payment.');
+      const msg = err?.data?.message || err?.message || 'Could not process your booking. Please try again.';
+      toast.error(msg);
     }
   };
 
@@ -110,7 +142,7 @@ export default function Checkout() {
             <h2 className="font-semibold text-white">Attendee Details</h2>
             <Input id="att-name"  label="Full Name"  type="text"  required placeholder="Your full name"  error={errors.attendeeName?.message}  {...register('attendeeName')} />
             <Input id="att-email" label="Email"      type="email" required placeholder="you@example.com" error={errors.attendeeEmail?.message} {...register('attendeeEmail')} />
-            <Input id="att-phone" label="Phone"      type="tel"   required placeholder="10-digit number"  error={errors.attendeePhone?.message} {...register('attendeePhone')} />
+            <Input id="att-phone" label="Phone"      type="tel"            placeholder="Optional — e.g. 9876543210"    error={errors.attendeePhone?.message} {...register('attendeePhone')} />
           </div>
 
           <Button

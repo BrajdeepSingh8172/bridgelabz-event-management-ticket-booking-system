@@ -26,15 +26,15 @@ export default function EditEvent() {
       // slice date to match datetime-local format (YYYY-MM-DDTHH:mm)
       const fmDate = (d) => d ? new Date(d).toISOString().slice(0, 16) : '';
       reset({
-        title: event.title,
-        venue: event.venue,
-        city: event.city,
-        startDate: fmDate(event.startDate),
-        endDate: fmDate(event.endDate),
-        category: event.category,
+        title:         event.title,
+        venue:         event.venue?.name ?? event.venue ?? '',  // venue is an object
+        city:          event.venue?.city ?? '',                  // city is nested in venue
+        startDate:     fmDate(event.startDate),
+        endDate:       fmDate(event.endDate),
+        category:      event.category,
         totalCapacity: event.totalCapacity,
-        description: event.description,
-        isFeatured: event.isFeatured,
+        description:   event.description,
+        isFeatured:    event.isFeatured,
       });
     }
   }, [event, reset]);
@@ -92,7 +92,7 @@ export default function EditEvent() {
         <div>
           <label className="label">Update Banner Image</label>
           <input id="evt-banner" type="file" accept="image/*" className="input py-2 text-slate-400 cursor-pointer" {...register('_bannerFile')} />
-          {event?.banner && (
+          {event?.bannerImage && (
             <p className="text-xs text-slate-400 mt-2">Current banner will be kept if no new file is selected.</p>
           )}
         </div>

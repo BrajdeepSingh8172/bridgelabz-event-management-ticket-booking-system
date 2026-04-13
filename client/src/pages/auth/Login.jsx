@@ -36,8 +36,17 @@ export default function Login() {
   const onSubmit = async (values) => {
     try {
       const data = await loginApi(values).unwrap();
-      dispatch(setCredentials({ accessToken: data.accessToken, user: data.user }));
-      toast.success(`Welcome back, ${data.user?.name}!`);
+      // data is now { user, accessToken } (ApiResponse.data unwrapped)
+      const rawUser = data.user ?? data;
+      const user = {
+        id:     rawUser._id ?? rawUser.id,
+        name:   rawUser.name,
+        email:  rawUser.email,
+        role:   rawUser.role,
+        avatar: rawUser.avatar ?? null,
+      };
+      dispatch(setCredentials({ accessToken: data.accessToken, user }));
+      toast.success(`Welcome back, ${user.name}!`);
       navigate(nextPath, { replace: true });
     } catch (err) {
       toast.error(err?.data?.message || 'Login failed. Check your credentials.');

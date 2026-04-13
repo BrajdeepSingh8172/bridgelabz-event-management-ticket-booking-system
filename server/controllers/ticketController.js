@@ -62,4 +62,24 @@ const updateTicket = async (req, res) => {
   res.json(new ApiResponse(200, updated, 'Ticket updated successfully'));
 };
 
-module.exports = { createTicket, getTicketsByEvent, updateTicket };
+// ── DELETE /api/tickets/:id ───────────────────────────────────────────────────
+const deleteTicket = async (req, res) => {
+  const ticket = await Ticket.findById(req.params.id).populate('event');
+  if (!ticket) throw new ApiError(404, 'Ticket not found');
+
+  if (
+    ticket.event.organizer.toString() !== req.user.id &&
+    req.user.role !== 'admin'
+  ) {
+    throw new ApiError(403, 'Only the event organizer can delete tickets');
+  }
+
+  if (ticket.soldQuantity > 0) {
+    throw new ApiError(400, `Cannot delete a ticket that has ${ticket.soldQuantity} sold units`);
+  }
+
+  await ticket.deleteOne();
+  res.json(new ApiResponse(200, null, 'Ticket deleted successfully'));
+};
+
+module.exports = { createTicket, getTicketsByEvent, updateTicket, deleteTicket };

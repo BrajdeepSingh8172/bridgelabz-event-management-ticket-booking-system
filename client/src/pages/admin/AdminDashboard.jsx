@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import axiosClient from '../../api/axiosClient';
 import { useAuth } from '../../hooks/useAuth';
 import Spinner from '../../components/ui/Spinner';
-import { UsersIcon, CalendarDaysIcon, CurrencyRupeeIcon } from '@heroicons/react/24/outline';
+import { UsersIcon, CalendarDaysIcon, CurrencyRupeeIcon, TicketIcon } from '@heroicons/react/24/outline';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -13,7 +13,8 @@ export default function AdminDashboard() {
     const fetchStats = async () => {
       try {
         const { data } = await axiosClient.get('/api/admin/stats');
-        setStats(data);
+        // ApiResponse shape: { success, data: { totalUsers, ... }, message }
+        setStats(data?.data ?? data);
       } catch (err) {
         console.error('Failed to load admin stats', err);
       } finally {
@@ -26,9 +27,10 @@ export default function AdminDashboard() {
   if (loading) return <div className="flex justify-center py-10"><Spinner /></div>;
 
   const statCards = [
-    { label: 'Total Users', value: stats?.totalUsers ?? '0', icon: UsersIcon, color: 'text-blue-400' },
-    { label: 'Total Events', value: stats?.totalEvents ?? '0', icon: CalendarDaysIcon, color: 'text-primary-400' },
-    { label: 'Platform Bookings', value: stats?.totalBookings ?? '0', icon: CurrencyRupeeIcon, color: 'text-emerald-400' },
+    { label: 'Total Users',     value: stats?.totalUsers    ?? '–', icon: UsersIcon,         color: 'text-blue-400'    },
+    { label: 'Total Events',    value: stats?.totalEvents   ?? '–', icon: CalendarDaysIcon,   color: 'text-primary-400' },
+    { label: 'Total Bookings',  value: stats?.totalBookings ?? '–', icon: TicketIcon,         color: 'text-violet-400'  },
+    { label: 'Platform Revenue',value: stats?.totalRevenue != null ? `₹${Number(stats.totalRevenue).toLocaleString('en-IN')}` : '–', icon: CurrencyRupeeIcon, color: 'text-emerald-400' },
   ];
 
   return (
@@ -38,7 +40,7 @@ export default function AdminDashboard() {
         <p className="page-subtitle">Platform overview and statistics</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
         {statCards.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="glass p-5">
             <div className="flex items-center gap-3 mb-2">

@@ -14,9 +14,15 @@ import { CalendarDaysIcon, MapPinIcon, UserCircleIcon } from '@heroicons/react/2
 export default function EventDetail() {
   const { id }    = useParams();
   const navigate   = useNavigate();
-  const { isAuth } = useAuth();
+  const { isAuth, isOrganizer, user } = useAuth();
   const { data: event, isLoading, error } = useGetEventByIdQuery(id);
-  const [selections, setSelections] = useState({});
+  const [selections, setSelections] = useState(() => {
+    // Restore saved selections for this event (survives login redirect)
+    try {
+      const saved = sessionStorage.getItem(`sel_${id}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
   useSocket(); // real-time seat updates
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
@@ -34,7 +40,14 @@ export default function EventDetail() {
   const hasSelected = Object.values(selections).some((q) => q > 0);
 
   const handleBook = () => {
-    if (!isAuth) { navigate(`/login?next=/events/${id}`); return; }
+    if (!isAuth) {
+      // Save selections so they survive the login redirect
+      try { sessionStorage.setItem(`sel_${id}`, JSON.stringify(selections)); } catch (_) {}
+      navigate(`/login?next=/events/${id}`);
+      return;
+    }
+    // Clear saved selections once we navigate to checkout
+    try { sessionStorage.removeItem(`sel_${id}`); } catch (_) {}
     navigate(`/checkout/${id}`, { state: { selections, event } });
   };
 
@@ -42,8 +55,8 @@ export default function EventDetail() {
     <div className="container-app py-10">
       {/* Banner */}
       <div className="relative w-full h-64 md:h-80 rounded-2xl overflow-hidden mb-8 bg-surface-border">
-        {event.banner ? (
-          <img src={event.banner} alt={event.title} className="w-full h-full object-cover" />
+        {event.bannerImage ? (
+          <img src={event.bannerImage} alt={event.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary-900/60 to-violet-900/60 flex items-center justify-center">
             <CalendarDaysIcon className="w-20 h-20 text-primary-400/30" />
@@ -72,7 +85,7 @@ export default function EventDetail() {
               {event.venue && (
                 <div className="flex items-center gap-1.5">
                   <MapPinIcon className="w-4 h-4 text-accent-400" />
-                  {event.venue}{event.city ? `, ${event.city}` : ''}
+                  {event.venue?.name}{event.venue?.city ? `, ${event.venue.city}` : ''}
                 </div>
               )}
               {event.organizer && (
@@ -104,18 +117,47 @@ export default function EventDetail() {
             {tickets.length > 0 ? (
               <TicketSelector ticketTypes={tickets} onChange={setSelections} />
             ) : (
-              <p className="text-slate-400 text-sm">No tickets available.</p>
+              <div className="text-center py-2">
+                <p className="text-slate-400 text-sm mb-3">No tickets available yet.</p>
+                {isOrganizer && event.organizer?._id === (user?.id ?? user?._id) && (
+                  <Link
+                    to={`/dashboard/events/${id}/tickets`}
+                    className="btn-sm btn-secondary text-xs"
+                  >
+                    + Add Tickets
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {/* Helper hint */}
+            {tickets.length > 0 && !hasSelected && !soldOut && (
+              <p className="text-xs text-amber-400/80 text-center mt-3">
+                ☝️ Select at least 1 ticket above to continue
+              </p>
             )}
 
             <Button
               onClick={handleBook}
-              disabled={soldOut || (!hasSelected && tickets.length > 0)}
-              className="w-full btn-lg btn-primary mt-5"
+              disabled={soldOut || tickets.length === 0 || (!hasSelected && tickets.length > 0)}
+              className={`w-full btn-lg mt-4 ${
+                soldOut || tickets.length === 0
+                  ? 'btn-secondary opacity-60 cursor-not-allowed'
+                  : hasSelected
+                  ? 'btn-primary'
+                  : 'btn-secondary opacity-70'
+              }`}
             >
-              {soldOut ? 'Sold Out' : 'Book Now'}
+              {soldOut
+                ? '🚫 Sold Out'
+                : tickets.length === 0
+                ? '⏳ Tickets Coming Soon'
+                : !hasSelected
+                ? 'Select Tickets Above'
+                : '🎟️ Book Now →'}
             </Button>
 
-            {!isAuth && !soldOut && (
+            {!isAuth && !soldOut && tickets.length > 0 && (
               <p className="text-center text-xs text-slate-500 mt-2">
                 You'll be asked to sign in
               </p>

@@ -53,7 +53,7 @@ axiosClient.interceptors.response.use(
 
       try {
         const { data } = await axiosClient.post('/api/auth/refresh-token');
-        const newToken = data.accessToken;
+        const newToken = data?.data?.accessToken || data?.accessToken;
         store.dispatch(setCredentials({ accessToken: newToken }));
         processQueue(null, newToken);
         originalRequest.headers['Authorization'] = `Bearer ${newToken}`;

@@ -18,14 +18,22 @@ const categoryColors = {
 export default function EventCard({ event }) {
   if (!event) return null;
 
-  const minPrice = event.ticketTypes?.length
+  // Use ticket types if available (detail page), otherwise fall back to event-level capacity
+  const hasTicketTypes = event.ticketTypes?.length > 0;
+
+  const minPrice = hasTicketTypes
     ? Math.min(...event.ticketTypes.map((t) => t.price))
-    : event.price ?? 0;
+    : 0; // events without tickets are free to browse
 
   const color = categoryColors[event.category?.toLowerCase()] ?? categoryColors.default;
-  const totalCapacity  = event.ticketTypes?.reduce((s, t) => s + t.capacity, 0)  ?? event.capacity  ?? 0;
-  const totalRemaining = event.ticketTypes?.reduce((s, t) => s + (t.remaining ?? t.capacity), 0) ?? event.capacity ?? 0;
-  const soldOut = totalRemaining <= 0;
+
+  // Remaining seats: prefer ticket-level data, fall back to event totalCapacity - soldCount
+  const totalRemaining = hasTicketTypes
+    ? event.ticketTypes.reduce((s, t) => s + (t.totalQuantity - (t.soldQuantity ?? 0)), 0)
+    : Math.max(0, (event.totalCapacity ?? 0) - (event.soldCount ?? 0));
+
+  // Only show "sold out" when capacity is known AND exhausted
+  const soldOut = event.totalCapacity > 0 && totalRemaining <= 0;
 
   return (
     <Link
@@ -34,9 +42,9 @@ export default function EventCard({ event }) {
     >
       {/* Banner */}
       <div className="relative h-44 overflow-hidden rounded-t-2xl bg-surface-border">
-        {event.banner ? (
+        {event.bannerImage ? (
           <img
-            src={event.banner}
+            src={event.bannerImage}
             alt={event.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
@@ -68,10 +76,10 @@ export default function EventCard({ event }) {
             <CalendarDaysIcon className="w-3.5 h-3.5 text-primary-400 flex-shrink-0" />
             <span>{formatDate(event.startDate)}</span>
           </div>
-          {event.city && (
+          {(event.venue?.city || event.venue?.name) && (
             <div className="flex items-center gap-1.5">
               <MapPinIcon className="w-3.5 h-3.5 text-accent-400 flex-shrink-0" />
-              <span className="truncate">{event.city}</span>
+              <span className="truncate">{event.venue?.city || event.venue?.name}</span>
             </div>
           )}
         </div>
@@ -79,7 +87,11 @@ export default function EventCard({ event }) {
         <div className="mt-auto pt-3 border-t border-surface-border flex items-center justify-between">
           <div className="flex items-center gap-1 text-xs text-slate-500">
             <UsersIcon className="w-3.5 h-3.5" />
-            <span>{totalRemaining} left</span>
+            <span>
+              {event.totalCapacity > 0
+                ? `${totalRemaining} left`
+                : 'Open'}
+            </span>
           </div>
           <span className="font-display font-bold text-primary-300 text-sm">
             {minPrice === 0 ? 'Free' : `from ${formatCurrency(minPrice)}`}

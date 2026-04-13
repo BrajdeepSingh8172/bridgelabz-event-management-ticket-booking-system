@@ -12,7 +12,7 @@ const router = express.Router();
 router.use(verifyToken);
 
 router.post('/create-order', paymentLimiter, createOrder);
-router.post('/verify',       verifyPayment);
-router.get('/:id',           getPaymentById);
+router.post('/verify', verifyPayment);
+router.get('/:id', getPaymentById);
 
 module.exports = router;

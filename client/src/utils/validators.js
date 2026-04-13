@@ -34,9 +34,16 @@ export const eventSchema = z.object({
 
 // ── Checkout / Attendee ───────────────────────────────────────────────────────
 export const checkoutSchema = z.object({
-  attendeeName:  z.string().min(2, 'Name is required'),
-  attendeeEmail: z.string().email('Valid email is required'),
-  attendeePhone: z.string().regex(/^\d{10}$/, 'Enter a valid 10-digit phone number'),
+  attendeeName:  z.string().min(2, 'Name must be at least 2 characters'),
+  attendeeEmail: z.string().email('Enter a valid email address'),
+  // Phone is optional — if provided, accept common formats (digits, spaces, +, dashes)
+  attendeePhone: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || v.trim() === '' || /^[+\d][\d\s\-]{7,14}$/.test(v.trim()),
+      { message: 'Enter a valid phone number' }
+    ),
 });
 
 // ── Profile ──────────────────────────────────────────────────────────────────

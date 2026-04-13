@@ -17,9 +17,9 @@ export default function BookingCard({ booking, onCancel, onViewQr }) {
   return (
     <div className="glass p-5 flex flex-col sm:flex-row gap-4">
       {/* Event banner thumb */}
-      {event.banner ? (
+      {event.bannerImage ? (
         <img
-          src={event.banner}
+          src={event.bannerImage}
           alt={event.title}
           className="w-full sm:w-28 h-24 sm:h-20 object-cover rounded-xl flex-shrink-0"
         />
@@ -42,10 +42,10 @@ export default function BookingCard({ booking, onCancel, onViewQr }) {
             <CalendarDaysIcon className="w-3.5 h-3.5 text-primary-400" />
             {formatDate(event.startDate)}
           </div>
-          {event.city && (
+          {(event.venue?.city || event.venue?.name) && (
             <div className="flex items-center gap-1.5">
               <MapPinIcon className="w-3.5 h-3.5 text-accent-400" />
-              {event.city}
+              {event.venue?.city || event.venue?.name}
             </div>
           )}
           <div className="flex items-center gap-1.5">

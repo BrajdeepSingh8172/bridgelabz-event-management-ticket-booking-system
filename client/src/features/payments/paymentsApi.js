@@ -16,12 +16,15 @@ export const paymentsApi = createApi({
   endpoints: (build) => ({
     createOrder: build.mutation({
       query: (body) => ({ url: '/create-order', method: 'POST', body }),
+      transformResponse: (res) => res.data || res,
     }),
     verifyPayment: build.mutation({
       query: (body) => ({ url: '/verify', method: 'POST', body }),
+      transformResponse: (res) => res.data || res,
     }),
     getPaymentById: build.query({
       query: (id) => `/${id}`,
+      transformResponse: (res) => res.data || res,
     }),
   }),
 });

@@ -16,10 +16,10 @@ export default function PaymentSuccess() {
   const { data: booking, isLoading } = useGetBookingByIdQuery(bookingId, { skip: !bookingId });
 
   const qrValue = JSON.stringify({
-    bookingId:  booking?._id,
+    bookingId:  booking?._id ?? booking?.id,
     ref:        booking?.bookingRef,
     event:      booking?.event?.title,
-    attendee:   booking?.attendeeName,
+    attendee:   booking?.attendeeInfo?.name ?? booking?.attendeeName,
   });
 
   const downloadQR = () => {

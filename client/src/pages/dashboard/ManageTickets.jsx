@@ -19,13 +19,16 @@ export default function ManageTickets() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const event = eventResp?.data || eventResp;
+  // getEventById uses transformResponse so eventResp IS the event directly
+  const event = eventResp;
 
   const fetchTickets = async () => {
     setIsLoadingTickets(true);
     try {
       const res = await axiosClient.get(`/api/tickets/event/${id}`);
-      setTickets(res.data?.data || res.data || []);
+      // ApiResponse shape: { success, data: [...tickets], message }
+      const raw = res.data?.data ?? res.data;
+      setTickets(Array.isArray(raw) ? raw : []);
     } catch (err) {
       toast.error('Failed to load tickets');
     } finally {

@@ -60,7 +60,7 @@ export default function MyEvents() {
                 <tr key={ev._id} className="border-b border-surface-border/50 hover:bg-white/3 transition-colors">
                   <td className="px-5 py-4">
                     <p className="font-medium text-white truncate max-w-[200px]">{ev.title}</p>
-                    {ev.city && <p className="text-xs text-slate-500">{ev.city}</p>}
+                    {ev.venue?.city && <p className="text-xs text-slate-500">{ev.venue.city}</p>}
                   </td>
                   <td className="px-4 py-4 text-slate-400 hidden sm:table-cell">{formatDate(ev.startDate)}</td>
                   <td className="px-4 py-4 hidden md:table-cell">
