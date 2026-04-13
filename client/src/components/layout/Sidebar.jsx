@@ -4,16 +4,17 @@ import {
   Squares2X2Icon,
   CalendarDaysIcon,
   PlusCircleIcon,
-  TicketIcon,
+  QrCodeIcon,
   UsersIcon,
   ShieldCheckIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 const organizerLinks = [
-  { to: '/dashboard',                icon: Squares2X2Icon, label: 'Overview'        },
-  { to: '/dashboard/events',         icon: CalendarDaysIcon, label: 'My Events'     },
-  { to: '/dashboard/events/new',     icon: PlusCircleIcon, label: 'Create Event'   },
+  { to: '/dashboard',            icon: Squares2X2Icon,   label: 'Overview'       },
+  { to: '/dashboard/events',     icon: CalendarDaysIcon, label: 'My Events'      },
+  { to: '/dashboard/events/new', icon: PlusCircleIcon,   label: 'Create Event'   },
+  { to: '/dashboard/scanner',    icon: QrCodeIcon,       label: 'QR Scanner'     },
 ];
 
 const adminLinks = [

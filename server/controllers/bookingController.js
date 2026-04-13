@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const Ticket  = require('../models/Ticket');
+const IssuedTicket = require('../models/IssuedTicket');
 const Event   = require('../models/Event');
 const User    = require('../models/User');
 const ApiError = require('../utils/ApiError');
@@ -151,13 +152,28 @@ const getUserBookings = async (req, res) => {
       .populate('tickets.ticket', 'name type price')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit)),
+      .limit(Number(limit))
+      .lean(),
     Booking.countDocuments({ user: req.user.id }),
   ]);
 
+  // Attach issuedTicket (qrImage + ticketCode) to each booking
+  const bookingIds = bookings.map((b) => b._id);
+  const issuedTickets = await IssuedTicket.find({ booking: { $in: bookingIds } })
+    .select('booking ticketCode qrImage tierName isUsed usedAt')
+    .lean();
+
+  const issuedMap = {};
+  for (const it of issuedTickets) issuedMap[it.booking.toString()] = it;
+
+  const enriched = bookings.map((b) => ({
+    ...b,
+    issuedTicket: issuedMap[b._id.toString()] ?? null,
+  }));
+
   res.json(
     new ApiResponse(200, {
-      bookings,
+      bookings: enriched,
       pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     }, 'Your bookings fetched')
   );
@@ -168,7 +184,8 @@ const getBookingById = async (req, res) => {
   const booking = await Booking.findById(req.params.id)
     .populate('event', 'title startDate endDate venue bannerImage organizer')
     .populate('tickets.ticket', 'name type price')
-    .populate('user', 'name email avatar');
+    .populate('user', 'name email avatar')
+    .lean();
 
   if (!booking) throw new ApiError(404, 'Booking not found');
 
@@ -180,7 +197,12 @@ const getBookingById = async (req, res) => {
     throw new ApiError(403, 'Not authorized to view this booking');
   }
 
-  res.json(new ApiResponse(200, booking, 'Booking fetched successfully'));
+  // Attach real IssuedTicket (contains JWT-signed qrImage for gate scanning)
+  const issuedTicket = await IssuedTicket.findOne({ booking: booking._id })
+    .select('ticketCode qrImage tierName isUsed usedAt paymentStatus')
+    .lean();
+
+  res.json(new ApiResponse(200, { ...booking, issuedTicket: issuedTicket ?? null }, 'Booking fetched successfully'));
 };
 
 // ── PATCH /api/bookings/:id/cancel ───────────────────────────────────────────

@@ -22,6 +22,7 @@ import MyEvents         from './pages/dashboard/MyEvents';
 import CreateEvent      from './pages/dashboard/CreateEvent';
 import EditEvent        from './pages/dashboard/EditEvent';
 import ManageTickets    from './pages/dashboard/ManageTickets';
+import QRScanner        from './pages/dashboard/QRScanner';
 
 import Profile          from './pages/profile/Profile';
 
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/dashboard/events/new" element={<CreateEvent />} />
         <Route path="/dashboard/events/:id/edit" element={<EditEvent />} />
         <Route path="/dashboard/events/:id/tickets" element={<ManageTickets />} />
+        <Route path="/dashboard/scanner" element={<QRScanner />} />
       </Route>
 
       {/* ── Admin Routes (AdminLayout) ───────────────────────── */}

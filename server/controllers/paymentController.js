@@ -4,6 +4,7 @@ const Razorpay  = require('razorpay');
 const Payment   = require('../models/Payment');
 const Booking   = require('../models/Booking');
 const Ticket    = require('../models/Ticket');
+const IssuedTicket = require('../models/IssuedTicket');
 const Event     = require('../models/Event');
 const User      = require('../models/User');
 const ApiError  = require('../utils/ApiError');
@@ -151,6 +152,45 @@ const createOrder = async (req, res) => {
   if (totalAmount === 0) {
     booking.status = 'confirmed';
     await booking.save();
+
+    // Issue QR ticket for free booking (non-blocking)
+    setImmediate(async () => {
+      try {
+        const { generateTicket } = require('../services/qrService');
+        const { sendBookingConfirmation } = require('../services/emailService');
+
+        const [userDoc, eventDoc] = await Promise.all([
+          User.findById(req.user.id).lean(),
+          Event.findById(eventId).lean(),
+        ]);
+        if (!userDoc || !eventDoc) return;
+
+        const tierName = savedTicketLines[0]?.name || 'General';
+        const { ticketCode, qrToken, qrImage } = await generateTicket(
+          { eventId, userId: req.user.id, tierName },
+          eventDoc
+        );
+
+        await IssuedTicket.create({
+          booking: booking._id, event: eventId, user: req.user.id,
+          ticketCode, qrToken, qrImage, tierName, paymentStatus: 'completed',
+        });
+
+        await Booking.findByIdAndUpdate(booking._id, { qrCode: qrImage });
+
+        await sendBookingConfirmation({
+          user:  { name: userDoc.name, email: userDoc.email },
+          event: eventDoc,
+          ticket: { tierName, ticketCode },
+          totalAmount: 0,
+          qrImage,
+        });
+        console.log(`✅ Free QR ticket issued & email sent: ${ticketCode}`);
+      } catch (e) {
+        console.error('⚠️  Free booking QR error:', e.message);
+      }
+    });
+
     return res.status(201).json(
       new ApiResponse(201, {
         isFree:    true,
@@ -160,6 +200,7 @@ const createOrder = async (req, res) => {
       }, 'Free booking confirmed')
     );
   }
+
 
   // ── Step 4: Paid event → create Razorpay order ────────────────────────────
   let razorpayOrder;
@@ -240,8 +281,64 @@ const verifyPayment = async (req, res) => {
   );
   if (!booking) throw new ApiError(404, 'Booking not found');
 
+  // ── Issue QR ticket + send confirmation email (non-blocking best-effort) ───
+  setImmediate(async () => {
+    try {
+      const { generateTicket } = require('../services/qrService');
+      const { sendBookingConfirmation } = require('../services/emailService');
+
+      const [userDoc, eventDoc] = await Promise.all([
+        User.findById(booking.user).lean(),
+        Event.findById(booking.event).lean(),
+      ]);
+
+      if (!userDoc || !eventDoc) return;
+
+      // Determine tier name from first ticket line
+      const tierName = booking.tickets?.[0]?.name || 'General';
+
+      const { ticketCode, qrToken, qrImage } = await generateTicket(
+        {
+          eventId:  booking.event.toString(),
+          userId:   booking.user.toString(),
+          tierName,
+        },
+        eventDoc
+      );
+
+      // Create one IssuedTicket per booking (expand to per-ticket-quantity if needed)
+      await IssuedTicket.create({
+        booking:       booking._id,
+        event:         booking.event,
+        user:          booking.user,
+        ticketCode,
+        qrToken,
+        qrImage,
+        tierName,
+        paymentStatus: 'completed',
+      });
+
+      // Also save qrImage on the booking for profile display
+      await Booking.findByIdAndUpdate(bookingId, { qrCode: qrImage });
+
+      // Send confirmation email with embedded QR
+      await sendBookingConfirmation({
+        user:  { name: userDoc.name,  email: userDoc.email },
+        event: eventDoc,
+        ticket: { tierName, ticketCode },
+        totalAmount: booking.totalAmount,
+        qrImage,
+      });
+
+      console.log(`✅ QR ticket issued & email sent: ${ticketCode}`);
+    } catch (e) {
+      console.error('⚠️  QR ticket / email error (payment already confirmed):', e.message);
+    }
+  });
+
   res.json(new ApiResponse(200, { payment, booking }, 'Payment verified — booking confirmed'));
 };
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/payments/:id

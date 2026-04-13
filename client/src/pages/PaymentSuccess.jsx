@@ -1,38 +1,28 @@
-import { useRef } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useGetBookingByIdQuery } from '../features/bookings/bookingsApi';
-import { QRCodeSVG } from 'qrcode.react';
 import Spinner from '../components/ui/Spinner';
 import Button  from '../components/ui/Button';
 import { formatDateTime } from '../utils/formatDate';
 import { formatCurrency }  from '../utils/formatCurrency';
-import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { CheckCircleIcon, QrCodeIcon } from '@heroicons/react/24/solid';
+import { XCircleIcon } from '@heroicons/react/24/outline';
 
 export default function PaymentSuccess() {
   const { state }   = useLocation();
   const bookingId   = state?.bookingId;
-  const svgRef      = useRef(null);
 
   const { data: booking, isLoading } = useGetBookingByIdQuery(bookingId, { skip: !bookingId });
 
-  const qrValue = JSON.stringify({
-    bookingId:  booking?._id ?? booking?.id,
-    ref:        booking?.bookingRef,
-    event:      booking?.event?.title,
-    attendee:   booking?.attendeeInfo?.name ?? booking?.attendeeName,
-  });
+  // Use the real JWT-signed QR image from IssuedTicket (attached by bookingController)
+  const issuedTicket = booking?.issuedTicket;
+  const qrImage      = issuedTicket?.qrImage || booking?.qrCode || null;
 
   const downloadQR = () => {
-    const svg  = svgRef.current?.querySelector('svg');
-    if (!svg)  return;
-    const data = new XMLSerializer().serializeToString(svg);
-    const blob = new Blob([data], { type: 'image/svg+xml' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `ticket-${booking?.bookingRef ?? 'qr'}.svg`;
+    if (!qrImage) return;
+    const a      = document.createElement('a');
+    a.href       = qrImage;
+    a.download   = `ticket-${issuedTicket?.ticketCode ?? booking?.bookingRef ?? 'qr'}.png`;
     a.click();
-    URL.revokeObjectURL(url);
   };
 
   if (!bookingId) {
@@ -55,11 +45,15 @@ export default function PaymentSuccess() {
         </div>
         <div>
           <h1 className="font-display font-bold text-3xl text-white">Booking Confirmed!</h1>
-          <p className="text-slate-400 mt-2">Your ticket is ready. Show the QR code at the venue.</p>
+          <p className="text-slate-400 mt-2">
+            {qrImage
+              ? 'Your QR ticket is ready. Show it at the venue entrance.'
+              : 'Your booking is confirmed. QR ticket will appear shortly.'}
+          </p>
         </div>
       </div>
 
-      {/* Booking info */}
+      {/* Booking details */}
       {booking && (
         <div className="glass p-6 mb-6 text-left space-y-3 animate-fade-in">
           <div className="flex justify-between text-sm">
@@ -76,6 +70,12 @@ export default function PaymentSuccess() {
             <span className="text-slate-400">Booking Ref</span>
             <span className="font-mono text-primary-300 font-semibold">{booking.bookingRef}</span>
           </div>
+          {issuedTicket?.ticketCode && (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-400">Ticket ID</span>
+              <span className="font-mono text-sm text-white">{issuedTicket.ticketCode}</span>
+            </div>
+          )}
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Amount Paid</span>
             <span className="text-emerald-400 font-semibold">{formatCurrency(booking.totalAmount)}</span>
@@ -83,16 +83,43 @@ export default function PaymentSuccess() {
         </div>
       )}
 
-      {/* QR Code */}
-      <div ref={svgRef} className="inline-block p-4 bg-white rounded-2xl shadow-card mb-6">
-        <QRCodeSVG value={qrValue} size={200} level="H" />
+      {/* QR Code — real JWT-signed PNG */}
+      <div className="flex justify-center mb-4">
+        {qrImage ? (
+          <div className="p-4 bg-white rounded-2xl shadow-card animate-fade-in">
+            <img
+              src={qrImage}
+              alt="Entry QR Code"
+              className="w-[200px] h-[200px] object-contain"
+            />
+          </div>
+        ) : (
+          <div className="w-[220px] h-[220px] glass border-dashed border-2 border-surface-border rounded-2xl flex flex-col items-center justify-center gap-3 animate-pulse-slow">
+            <QrCodeIcon className="w-12 h-12 text-primary-400/40" />
+            <p className="text-slate-400 text-sm">Generating QR ticket…</p>
+            <p className="text-slate-500 text-xs px-4">
+              Your QR code will also be emailed to you shortly.
+            </p>
+          </div>
+        )}
       </div>
 
+      {qrImage && (
+        <p className="text-xs text-red-400 font-semibold mb-6">
+          ⚠️ Valid for ONE entry only. Do not share this QR code.
+        </p>
+      )}
+
       <div className="flex flex-col gap-3">
-        <Button onClick={downloadQR} variant="secondary" size="lg" className="w-full">
-          ⬇ Download QR Ticket
-        </Button>
-        <Link to="/events" className="btn-lg btn-ghost w-full">
+        {qrImage && (
+          <Button onClick={downloadQR} variant="secondary" size="lg" className="w-full">
+            ⬇ Download QR Ticket (PNG)
+          </Button>
+        )}
+        <Link to="/profile" className="btn-lg btn-ghost w-full">
+          View My Bookings
+        </Link>
+        <Link to="/events" className="btn-lg btn-ghost w-full text-slate-500">
           Browse More Events
         </Link>
       </div>

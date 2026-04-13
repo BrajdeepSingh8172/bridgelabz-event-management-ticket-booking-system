@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useGetFeaturedEventsQuery } from '../features/events/eventsApi';
 import EventGrid from '../components/events/EventGrid';
+import EventCard from '../components/events/EventCard';
 import Button    from '../components/ui/Button';
 import { CalendarDaysIcon, TicketIcon, UsersIcon, StarIcon } from '@heroicons/react/24/outline';
 
@@ -75,7 +76,31 @@ export default function Home() {
             View all →
           </Link>
         </div>
-        <EventGrid events={featured} isLoading={isLoading} error={error} />
+        
+        {isLoading || error ? (
+          <EventGrid isLoading={isLoading} error={error} />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            {featured.map((event) => (
+              <EventCard key={event._id} event={event} />
+            ))}
+            
+            {featured.length < 3 && (
+              <div className="group glass border-2 border-dashed border-surface-border hover:border-primary-500/40 flex flex-col items-center justify-center text-center p-8 rounded-2xl transition-all duration-300 hover:bg-white/5 h-full min-h-[350px]">
+                <div className="w-14 h-14 rounded-full bg-surface-border flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <CalendarDaysIcon className="w-6 h-6 text-primary-400" />
+                </div>
+                <h3 className="font-display font-semibold text-lg text-white mb-2">No more events yet</h3>
+                <p className="text-slate-400 text-sm mb-6 max-w-[200px]">
+                  Want to host an experience? Create and manage it easily here.
+                </p>
+                <Link to="/dashboard/events/new" className="btn-sm btn-primary">
+                  Create Event
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ── CTA ──────────────────────────────────────────────────── */}

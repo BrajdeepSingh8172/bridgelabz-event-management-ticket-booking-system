@@ -6,6 +6,7 @@ import { authApi }    from '../features/auth/authApi';
 import { eventsApi }  from '../features/events/eventsApi';
 import { bookingsApi } from '../features/bookings/bookingsApi';
 import { paymentsApi } from '../features/payments/paymentsApi';
+import { ticketsApi }  from '../features/tickets/ticketsApi';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     [eventsApi.reducerPath]:   eventsApi.reducer,
     [bookingsApi.reducerPath]: bookingsApi.reducer,
     [paymentsApi.reducerPath]: paymentsApi.reducer,
+    [ticketsApi.reducerPath]:  ticketsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -23,6 +25,7 @@ export const store = configureStore({
       eventsApi.middleware,
       bookingsApi.middleware,
       paymentsApi.middleware,
+      ticketsApi.middleware,
     ),
 });
 
