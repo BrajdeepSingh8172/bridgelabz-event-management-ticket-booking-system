@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
  */
 const sendBookingConfirmation = async (params) => {
   // ── Normalise into a single shape ──────────────────────────────────────────
-  let to, holderName, ticketCode, tierName, eventTitle, eventDate, venueName, totalAmount, qrImage;
+  let to, holderName, ticketCode, tierName, eventTitle, eventDate, venueName, totalAmount, qrImage, eventId;
 
   if (params.user && params.event && params.ticket) {
     // New shape
@@ -39,6 +39,7 @@ const sendBookingConfirmation = async (params) => {
       : 'TBD';
     totalAmount = params.totalAmount ?? 0;
     qrImage     = params.qrImage || null;
+    eventId     = params.event._id || params.event.id || '';
   } else {
     // Legacy flat shape
     to          = params.to;
@@ -50,6 +51,7 @@ const sendBookingConfirmation = async (params) => {
     venueName   = params.venueName     || 'TBD';
     totalAmount = params.totalAmount   ?? 0;
     qrImage     = params.qrCode        || params.qrImage || null;
+    eventId     = params.eventId       || '';
   }
 
   // ── Build HTML ──────────────────────────────────────────────────────────────
@@ -94,8 +96,12 @@ const sendBookingConfirmation = async (params) => {
           <td style="padding:10px 12px;font-weight:bold;color:#333">Ticket ID</td>
           <td style="padding:10px 12px;color:#333;font-family:monospace">${ticketCode}</td>
         </tr>
-        ${totalAmount > 0 ? `
         <tr>
+          <td style="padding:10px 12px;font-weight:bold;color:#333">Event ID</td>
+          <td style="padding:10px 12px;color:#333;font-family:monospace;font-size:12px">${eventId}</td>
+        </tr>
+        ${totalAmount > 0 ? `
+        <tr style="background:#e8f4fd">
           <td style="padding:10px 12px;font-weight:bold;color:#333">Amount Paid</td>
           <td style="padding:10px 12px;color:#333">₹${Number(totalAmount).toLocaleString('en-IN')}</td>
         </tr>` : ''}

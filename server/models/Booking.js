@@ -74,7 +74,6 @@ const bookingSchema = new mongoose.Schema(
 // ── Indexes ───────────────────────────────────────────────────────────────────
 bookingSchema.index({ user: 1, createdAt: -1 });
 bookingSchema.index({ event: 1 });
-bookingSchema.index({ bookingRef: 1 });
 
 // ── Auto-generate 8-char uppercase booking reference ──────────────────────────
 bookingSchema.pre('validate', function (next) {

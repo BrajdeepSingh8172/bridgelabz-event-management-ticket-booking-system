@@ -25,8 +25,9 @@ export default function CreateEvent() {
         if (v !== undefined && v !== '') formData.append(k, v);
       });
       const banner = values._bannerFile?.[0];
-      if (banner) formData.append('banner', banner);
+      if (banner) formData.append('bannerImage', banner);
 
+      console.log('📦 FormData Debug:', Object.fromEntries(formData.entries()));
       const result = await createEvent(formData).unwrap();
       toast.success('Event created! 🎉');
       // result is the event object directly (transformResponse already unwrapped ApiResponse.data)

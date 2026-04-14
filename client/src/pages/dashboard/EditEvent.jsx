@@ -46,7 +46,7 @@ export default function EditEvent() {
         if (v !== undefined && v !== '') formData.append(k, v);
       });
       const banner = values._bannerFile?.[0];
-      if (banner) formData.append('banner', banner);
+      if (banner) formData.append('bannerImage', banner);
 
       await updateEvent({ id, formData }).unwrap();
       toast.success('Event updated!');

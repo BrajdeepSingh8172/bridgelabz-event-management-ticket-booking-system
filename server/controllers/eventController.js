@@ -18,6 +18,7 @@ const createEvent = async (req, res) => {
     totalCapacity: Number(req.body.totalCapacity) || 100
   };
 
+  console.log('📸 Upload check - req.file:', req.file);
   if (req.file?.path) body.bannerImage = req.file.path; // Cloudinary URL
 
   const event = await Event.create(body);

@@ -18,17 +18,13 @@ const generateQRToken = (ticketData, eventEndTime) => {
 
   return jwt.sign(
     {
-      ticketCode: ticketData.ticketCode,
-      eventId:    ticketData.eventId,
-      userId:     ticketData.userId,
-      tierName:   ticketData.tierName || 'General',
+      tc: ticketData.ticketCode,
+      ei: ticketData.eventId,
+      ui: ticketData.userId,
+      tn: ticketData.tierName || 'General',
     },
     process.env.QR_SECRET,
-    {
-      expiresIn,
-      issuer:   'EventHub',
-      audience: 'entry-scanner',
-    }
+    { expiresIn }
   );
 };
 
@@ -40,11 +36,11 @@ const generateQRToken = (ticketData, eventEndTime) => {
  */
 const generateQRImage = async (qrToken) => {
   return await QRCode.toDataURL(qrToken, {
-    errorCorrectionLevel: 'H',
+    errorCorrectionLevel: 'L',
     type:   'image/png',
-    width:  400,
-    margin: 2,
-    color:  { dark: '#0A1931', light: '#FFFFFF' },
+    width:  600,
+    margin: 4,
+    color:  { dark: '#000000', light: '#FFFFFF' },
   });
 };
 
@@ -83,10 +79,7 @@ const generateTicket = async (bookingData, event) => {
  * @returns {{ ticketCode, eventId, userId, tierName, iat, exp }}
  */
 const verifyQRToken = (qrToken) => {
-  return jwt.verify(qrToken, process.env.QR_SECRET, {
-    issuer:   'EventHub',
-    audience: 'entry-scanner',
-  });
+  return jwt.verify(qrToken, process.env.QR_SECRET);
 };
 
 // Keep backward-compat export for any code using the old generateQR name

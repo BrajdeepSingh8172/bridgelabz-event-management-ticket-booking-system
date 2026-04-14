@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import jsQR from 'jsqr';
+import { Html5Qrcode } from 'html5-qrcode';
 import { useValidateTicketMutation } from '../../features/tickets/ticketsApi';
 import {
   QrCodeIcon,
@@ -60,66 +60,37 @@ const RESULT_CONFIG = {
 export default function QRScanner() {
   const [validateTicket] = useValidateTicketMutation();
 
-  // Camera state
-  const videoRef   = useRef(null);
-  const canvasRef  = useRef(null);
-  const streamRef  = useRef(null);
-  const rafRef     = useRef(null);
-
-  const [cameraActive,  setCameraActive]  = useState(false);
-  const [cameraError,   setCameraError]   = useState(null);
-  const [scanning,      setScanning]      = useState(false);
+  // Scanner state
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError]   = useState(null);
+  const [scanning, setScanning]         = useState(false);
+  const scannerRef                      = useRef(null);
 
   // Validation state
-  const [validating,    setValidating]    = useState(false);
-  const [result,        setResult]        = useState(null);
-  const [manualToken,   setManualToken]   = useState('');
-  const [scanCount,     setScanCount]     = useState(0);
+  const [validating, setValidating] = useState(false);
+  const [result, setResult]         = useState(null);
+  const [manualToken, setManualToken] = useState('');
+  const [scanCount, setScanCount]   = useState(0);
 
-  // ── Camera helpers ─────────────────────────────────────────────────────────
-  const stopCamera = useCallback(() => {
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    setCameraActive(false);
-    setScanning(false);
-  }, []);
-
-  const startCamera = useCallback(async () => {
-    setCameraError(null);
-    setResult(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraActive(true);
-      setScanning(true);
-    } catch (err) {
-      setCameraError(
-        err.name === 'NotAllowedError'
-          ? 'Camera access denied. Please allow camera permission in your browser settings.'
-          : `Camera error: ${err.message}`
-      );
-    }
-  }, []);
-
-  useEffect(() => () => stopCamera(), [stopCamera]);
-
-  // ── QR validation via RTK mutation ────────────────────────────────────────
+  // ── QR validation handler ────────────────────────────────────────────────
   const handleValidation = useCallback(async (token) => {
     if (!token?.trim() || validating) return;
-    setValidating(true);
-    setScanning(false);
+    
+    // Stop scanning immediately to prevent duplicate scans
+    const scanner = scannerRef.current;
+    if (scanner && scanner.isScanning) {
+        try {
+            await scanner.pause(true);
+            setScanning(false);
+        } catch (err) {
+            console.error('Failed to pause scanner:', err);
+        }
+    }
 
+    setValidating(true);
     try {
       const json = await validateTicket({ qrToken: token.trim() }).unwrap();
 
-      // unwrap gives us the raw ApiResponse envelope {statusCode, data, message}
       const resultKey = json.data?.result ?? (
         json.statusCode === 200 ? 'valid' :
         json.statusCode === 409 ? 'already_used' :
@@ -131,12 +102,11 @@ export default function QRScanner() {
       setResult({ resultKey, message: json.message, data: json.data });
       setScanCount((c) => c + 1);
 
-      if (resultKey === 'valid')        toast.success('Entry granted!',          { icon: '✅' });
+      if (resultKey === 'valid') toast.success('Entry granted!', { icon: '✅' });
       else if (resultKey === 'already_used') toast.error('Ticket already used!', { icon: '🚫' });
-      else                              toast.error(json.message || 'Invalid ticket');
+      else toast.error(json.message || 'Invalid ticket');
 
     } catch (err) {
-      // RTK throws on non-2xx; check err.data for the ApiResponse body
       const errBody = err?.data;
       const resultKey = errBody?.data?.result ?? (
         err?.status === 409 ? 'already_used' :
@@ -152,50 +122,82 @@ export default function QRScanner() {
     }
   }, [validateTicket, validating]);
 
+  // ── Scanner Lifecycle ────────────────────────────────────────────────────
+  const startCamera = useCallback(async () => {
+    setCameraError(null);
+    setResult(null);
+    
+    try {
+      const scanner = new Html5Qrcode("reader");
+      scannerRef.current = scanner;
 
-  // Scan loop — reads video frames and looks for QR
-  const tick = useCallback(() => {
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
-      rafRef.current = requestAnimationFrame(tick);
-      return;
+      const config = {
+        fps: 15,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+      };
+
+      await scanner.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+          handleValidation(decodedText);
+        },
+        (errorMessage) => {
+          // silent error for frame-swiping
+        }
+      );
+
+      setCameraActive(true);
+      setScanning(true);
+    } catch (err) {
+      setCameraError(`Camera error: ${err.message || 'Access denied'}`);
+      setCameraActive(false);
     }
-
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert',
-    });
-
-    if (code?.data) {
-      handleValidation(code.data);
-      return; // don't schedule next frame — wait for validation result
-    }
-
-    rafRef.current = requestAnimationFrame(tick);
   }, [handleValidation]);
 
-  useEffect(() => {
-    if (scanning && cameraActive) {
-      rafRef.current = requestAnimationFrame(tick);
-    } else {
-      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+  const stopCamera = useCallback(async () => {
+    const scanner = scannerRef.current;
+    if (scanner) {
+      try {
+        if (scanner.isScanning) {
+            await scanner.stop();
+        }
+        scannerRef.current = null;
+      } catch (err) {
+        console.error('Failed to stop scanner:', err);
+      }
     }
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [scanning, cameraActive, tick]);
+    setCameraActive(false);
+    setScanning(false);
+  }, []);
 
-  const resumeScanning = () => {
+  const resumeScanning = async () => {
     setResult(null);
     setManualToken('');
-    setScanning(true);
+    const scanner = scannerRef.current;
+    if (scanner) {
+        try {
+            scanner.resume();
+            setScanning(true);
+        } catch (err) {
+            console.error('Failed to resume scanner:', err);
+            // Fallback: restart
+            await stopCamera();
+            await startCamera();
+        }
+    }
   };
 
-  // ── Render result card ─────────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+        if (scannerRef.current?.isScanning) {
+            scannerRef.current.stop().catch(console.error);
+        }
+    };
+  }, []);
+
+  // ── Render Helpers ────────────────────────────────────────────────────────
   const renderResult = () => {
     if (!result) return null;
     const cfg  = RESULT_CONFIG[result.resultKey] ?? RESULT_CONFIG.error;
@@ -278,82 +280,45 @@ export default function QRScanner() {
       </div>
 
       {/* Camera panel */}
-      <div className="glass overflow-hidden">
-        {/* Camera view */}
-        <div className="relative bg-black aspect-video flex items-center justify-center">
-          <video
-            ref={videoRef}
-            className={`w-full h-full object-cover ${cameraActive ? 'block' : 'hidden'}`}
-            playsInline
-            muted
-          />
+      <div className="glass overflow-hidden relative">
+        <div id="reader" className={`${cameraActive ? 'block' : 'hidden'} w-full border-0`} />
+        
+        {!cameraActive && !cameraError && (
+          <div className="text-center py-20 bg-black/20">
+            <CameraIcon className="w-16 h-16 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400">Camera is off</p>
+          </div>
+        )}
 
-          {/* Scanning overlay */}
-          {cameraActive && scanning && !validating && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative w-56 h-56">
-                {/* corner brackets */}
-                <div className="absolute top-0 left-0  w-8 h-8 border-t-4 border-l-4 border-primary-400 rounded-tl-lg" />
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary-400 rounded-tr-lg" />
-                <div className="absolute bottom-0 left-0  w-8 h-8 border-b-4 border-l-4 border-primary-400 rounded-bl-lg" />
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary-400 rounded-br-lg" />
-                {/* scan line */}
-                <div className="absolute top-0 left-4 right-4 h-0.5 bg-primary-400 animate-scan-line" />
-              </div>
-              <p className="absolute bottom-4 text-white/70 text-xs bg-black/40 px-3 py-1 rounded-full">
-                Align QR code within the frame
-              </p>
+        {cameraError && (
+          <div className="text-center px-6 py-14 bg-black/20">
+            <ExclamationTriangleIcon className="w-12 h-12 text-amber-400 mx-auto mb-3" />
+            <p className="text-amber-400 font-medium mb-2">Scanner Failure</p>
+            <p className="text-slate-400 text-sm">{cameraError}</p>
+          </div>
+        )}
+
+        {validating && (
+          <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20">
+            <div className="text-center">
+              <div className="w-10 h-10 border-2 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-white text-sm">Validating ticket…</p>
             </div>
-          )}
-
-          {validating && (
-            <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-10 h-10 border-2 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-white text-sm">Validating ticket…</p>
-              </div>
-            </div>
-          )}
-
-          {!cameraActive && !cameraError && (
-            <div className="text-center py-16">
-              <CameraIcon className="w-16 h-16 text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-400">Camera is off</p>
-            </div>
-          )}
-
-          {cameraError && (
-            <div className="text-center px-6 py-10">
-              <ExclamationTriangleIcon className="w-12 h-12 text-amber-400 mx-auto mb-3" />
-              <p className="text-amber-400 font-medium mb-2">Camera Unavailable</p>
-              <p className="text-slate-400 text-sm">{cameraError}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Canvas (hidden — used for frame processing only) */}
-        <canvas ref={canvasRef} className="hidden" />
+          </div>
+        )}
 
         {/* Camera controls */}
-        <div className="p-4 flex gap-3">
+        <div className="p-4 flex gap-3 bg-surface-dark border-t border-surface-border">
           {!cameraActive ? (
             <button onClick={startCamera} className="flex-1 btn-md btn-primary gap-2">
               <CameraIcon className="w-4 h-4" />
-              Start Camera
+              Start Scanner
             </button>
           ) : (
             <>
-              <button
-                onClick={() => setScanning((s) => !s)}
-                disabled={validating}
-                className="flex-1 btn-md btn-secondary gap-2"
-              >
-                {scanning
-                  ? <><StopIcon className="w-4 h-4" /> Pause</>
-                  : <><QrCodeIcon className="w-4 h-4" /> Resume</>}
-              </button>
-              <button onClick={stopCamera} className="btn-md btn-secondary text-red-400 hover:text-red-300">
-                Stop Camera
+              <button onClick={stopCamera} className="flex-1 btn-md btn-secondary text-red-400 hover:text-red-300 gap-2">
+                <StopIcon className="w-4 h-4" />
+                Stop Scanner
               </button>
             </>
           )}
@@ -390,25 +355,33 @@ export default function QRScanner() {
         </div>
       </div>
 
-      {/* Scan line animation keyframes injected via style tag */}
       <style>{`
-        @keyframes scan-line {
-          0%   { top: 0; opacity: 1; }
-          50%  { top: calc(100% - 2px); opacity: 0.6; }
-          100% { top: 0; opacity: 1; }
+        #reader video {
+            width: 100% !important;
+            border-radius: 0 !important;
+            object-fit: cover !important;
         }
-        .animate-scan-line { animation: scan-line 2s ease-in-out infinite; }
+        #reader__dashboard_section_csr button {
+            display: none !important;
+        }
+        #reader__scan_region {
+            background: #000 !important;
+        }
+        #reader__scan_region > div {
+            border: 0 !important;
+        }
       `}</style>
     </div>
   );
 }
 
-// ── Small helper subcomponent ──────────────────────────────────────────────
 function Row({ label, value }) {
   return (
     <div className="glass-sm px-3 py-2 rounded-lg">
       <p className="text-slate-400 text-xs">{label}</p>
-      <p className="text-white font-medium truncate">{value}</p>
+      <p className="text-white font-medium truncate">
+        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+      </p>
     </div>
   );
 }

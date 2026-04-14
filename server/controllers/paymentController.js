@@ -124,11 +124,6 @@ const createOrder = async (req, res) => {
 
   // ── Step 2: Post-commit side-effects (non-critical) ─────────────────────────
   try {
-    const { generateQR } = require('../services/qrService');
-    const qrCode = await generateQR(booking.bookingRef);
-    booking.qrCode = qrCode;
-    await booking.save();
-
     const { sendBookingConfirmation } = require('../services/emailService');
     const [userDoc, eventDoc] = await Promise.all([
       User.findById(req.user.id).lean(),
@@ -142,7 +137,7 @@ const createOrder = async (req, res) => {
       eventDate:    eventDoc?.startDate ? new Date(eventDoc.startDate).toDateString() : 'TBD',
       venueName:    eventDoc?.venue?.name || 'TBD',
       totalAmount,
-      qrCode,
+      eventId:      eventId,
     });
   } catch (e) {
     console.error('⚠️  Post-booking side-effect error (booking saved OK):', e.message);

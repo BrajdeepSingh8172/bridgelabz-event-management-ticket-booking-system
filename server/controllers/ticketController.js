@@ -101,10 +101,7 @@ const validateTicket = async (req, res) => {
   // ── Step 1: Verify JWT signature + expiry ─────────────────────────────────
   let decoded;
   try {
-    decoded = jwt.verify(qrToken, process.env.QR_SECRET, {
-      issuer:   'EventHub',
-      audience: 'entry-scanner',
-    });
+    decoded = jwt.verify(qrToken, process.env.QR_SECRET);
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(400).json(
@@ -125,7 +122,7 @@ const validateTicket = async (req, res) => {
     // If isUsed is already true, findOneAndUpdate returns null → we handle below.
     const ticket = await IssuedTicket.findOneAndUpdate(
       {
-        ticketCode:    decoded.ticketCode,
+        ticketCode:    decoded.tc,
         isUsed:        false,
         paymentStatus: 'completed',
       },
@@ -160,7 +157,7 @@ const validateTicket = async (req, res) => {
           holderEmail: ticket.user?.email,
           tierName:    ticket.tierName,
           eventName:   ticket.event?.title,
-          venue:       ticket.event?.venue,
+          venue:       ticket.event?.venue?.name,
           bookingRef:  ticket.booking?.bookingRef,
           usedAt:      ticket.usedAt,
         }, '✅ Valid entry — access granted')
@@ -172,7 +169,7 @@ const validateTicket = async (req, res) => {
     session.endSession();
 
     // Find out why it failed
-    const existing = await IssuedTicket.findOne({ ticketCode: decoded.ticketCode })
+    const existing = await IssuedTicket.findOne({ ticketCode: decoded.tc })
       .populate('user', 'name email');
 
     if (!existing) {

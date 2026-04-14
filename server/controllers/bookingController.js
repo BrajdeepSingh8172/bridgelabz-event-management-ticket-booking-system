@@ -99,12 +99,8 @@ const createBooking = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // ── Post-commit: QR + email (non-critical, do not roll back for these) ──
+    // ── Post-commit: email (non-critical, do not roll back) ──
     try {
-      const qrCode = await generateQR(booking.bookingRef);
-      booking.qrCode = qrCode;
-      await booking.save();
-
       const userDoc = attendeeInfo?.email ? null : await User.findById(req.user.id).lean();
       await sendBookingConfirmation({
         to: attendeeInfo?.email || userDoc?.email || '',
@@ -112,9 +108,9 @@ const createBooking = async (req, res) => {
         bookingRef: booking.bookingRef,
         eventTitle: event.title,
         eventDate: event.startDate.toDateString(),
-        venueName: event.venue?.name || '',
+        venueName:    event.venue?.name || '',
         totalAmount,
-        qrCode,
+        eventId:      event._id,
       });
     } catch (emailOrQrErr) {
       console.error('⚠️   Post-booking email/QR error (booking is still saved):', emailOrQrErr.message);

@@ -9,6 +9,8 @@ const cookieParser = require('cookie-parser');
 const passport = require('passport');
 
 const { connectCloudinary } = require('./config/cloudinary');
+connectCloudinary();
+
 require('./config/passport'); // registers GoogleStrategy side-effects
 
 const { apiLimiter } = require('./middleware/rateLimiter');
@@ -45,9 +47,6 @@ app.use(passport.initialize());
 
 // Rate-limit all /api/* requests
 app.use('/api', apiLimiter);
-
-// ── Cloudinary ────────────────────────────────────────────────────────────────
-connectCloudinary();
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', apiRouter);

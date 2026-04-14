@@ -29,6 +29,7 @@ const avatarStorage = new CloudinaryStorage({
 
 /** File-type filter: images only */
 const imageFilter = (_req, file, cb) => {
+  console.log('📁 Multer filter check:', file.originalname, file.mimetype);
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
