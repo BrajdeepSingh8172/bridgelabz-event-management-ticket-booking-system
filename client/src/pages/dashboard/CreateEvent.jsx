@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +12,7 @@ const CATEGORIES = ['Conference', 'Concert', 'Festival', 'Sports', 'Workshop', '
 
 export default function CreateEvent() {
   const navigate = useNavigate();
+  const [preview, setPreview] = useState(null);
   const [createEvent, { isLoading }] = useCreateEventMutation();
 
   const { register, handleSubmit, formState: { errors } } = useForm({
@@ -22,12 +24,17 @@ export default function CreateEvent() {
     try {
       const formData = new FormData();
       Object.entries(values).forEach(([k, v]) => {
-        if (v !== undefined && v !== '') formData.append(k, v);
+        // Skip internal/file fields — handled separately below
+        if (k.startsWith('_')) return;
+        if (v === undefined || v === '') return;
+        // Booleans must be sent as 'true'/'false' strings correctly
+        formData.append(k, typeof v === 'boolean' ? String(v) : v);
       });
+      // Append actual file (if selected) under the field name multer expects
       const banner = values._bannerFile?.[0];
       if (banner) formData.append('bannerImage', banner);
 
-      console.log('📦 FormData Debug:', Object.fromEntries(formData.entries()));
+      console.log('📦 FormData entries:', [...formData.entries()].map(([k,v]) => `${k}: ${v instanceof File ? v.name : v}`));
       const result = await createEvent(formData).unwrap();
       toast.success('Event created! 🎉');
       // result is the event object directly (transformResponse already unwrapped ApiResponse.data)
@@ -74,7 +81,28 @@ export default function CreateEvent() {
 
         <div>
           <label className="label">Banner Image</label>
-          <input id="ev-banner" type="file" accept="image/*" className="input py-2 text-slate-400 file:mr-3 file:px-3 file:py-1 file:rounded-lg file:border-0 file:bg-primary-600/20 file:text-primary-300 hover:file:bg-primary-600/30 cursor-pointer" {...register('_bannerFile')} />
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            {preview && (
+              <div className="w-32 h-20 rounded-xl overflow-hidden bg-surface-border flex-shrink-0 border border-primary-500/30">
+                <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+              </div>
+            )}
+            <div className="flex-1 w-full">
+              <input 
+                id="ev-banner" 
+                type="file" 
+                accept="image/*" 
+                className="input py-2 text-slate-400 cursor-pointer" 
+                {...register('_bannerFile', {
+                  onChange: (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setPreview(URL.createObjectURL(file));
+                  }
+                })} 
+              />
+              <p className="text-[10px] text-slate-500 mt-1">Recommend 1280x720. Max size 5MB.</p>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

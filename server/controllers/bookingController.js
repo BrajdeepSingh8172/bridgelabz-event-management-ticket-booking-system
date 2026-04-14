@@ -123,8 +123,8 @@ const createBooking = async (req, res) => {
         const ticket = await Ticket.findById(line.ticket).lean();
         io.to(`event:${eventId}`).emit('ticketUpdate', {
           eventId,
-          ticketId: line.ticket,
-          remainingQuantity: ticket.totalQuantity - ticket.soldQuantity,
+          ticketTypeId: line.ticket,
+          soldQuantity: ticket.soldQuantity,
         });
       }
     }
@@ -242,8 +242,8 @@ const cancelBooking = async (req, res) => {
         if (ticket) {
           io.to(`event:${booking.event}`).emit('ticketUpdate', {
             eventId: booking.event,
-            ticketId: line.ticket,
-            remainingQuantity: ticket.totalQuantity - ticket.soldQuantity,
+            ticketTypeId: line.ticket,
+            soldQuantity: ticket.soldQuantity,
           });
         }
       }

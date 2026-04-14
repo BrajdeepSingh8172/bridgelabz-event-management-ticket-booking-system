@@ -89,7 +89,7 @@ const createOrder = async (req, res) => {
         { session }
       );
 
-      savedTicketLines.push({ ticket: ticket._id, quantity, unitPrice: ticket.price });
+      savedTicketLines.push({ ticket: ticket._id, name: ticket.name, quantity, unitPrice: ticket.price });
       totalAmount    += ticket.price * quantity;
       totalQtyBooked += quantity;
     }
@@ -116,6 +116,18 @@ const createOrder = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+    // ── Socket.IO — emit ticketUpdate (real-time quantity sync) ──────────────
+    const io = req.app.get('io');
+    if (io) {
+      for (const line of savedTicketLines) {
+        const ticket = await Ticket.findById(line.ticket).lean();
+        io.to(`event:${eventId}`).emit('ticketUpdate', {
+          eventId,
+          ticketTypeId: line.ticket,
+          soldQuantity: ticket.soldQuantity,
+        });
+      }
+    }
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
@@ -273,8 +285,25 @@ const verifyPayment = async (req, res) => {
     bookingId,
     { status: 'confirmed' },
     { new: true }
-  );
+  ).populate('tickets.ticket', 'name soldQuantity totalQuantity');
+
   if (!booking) throw new ApiError(404, 'Booking not found');
+  
+  // ── Socket.IO — emit ticketUpdate (real-time quantity sync) ──────────────
+  const io = req.app.get('io');
+  if (io) {
+    for (const line of booking.tickets) {
+      const ticket = line.ticket || {}; // populated
+      io.to(`event:${booking.event._id || booking.event}`).emit('ticketUpdate', {
+        eventId:      booking.event._id || booking.event,
+        ticketTypeId: ticket._id || line.ticket,
+        soldQuantity: ticket.soldQuantity,
+      });
+    }
+  }
+
+  // ── Determine tier name from populated tickets ────────────────────────────
+  const tierName = booking.tickets?.[0]?.ticket?.name || 'General';
 
   // ── Issue QR ticket + send confirmation email (non-blocking best-effort) ───
   setImmediate(async () => {
@@ -288,9 +317,6 @@ const verifyPayment = async (req, res) => {
       ]);
 
       if (!userDoc || !eventDoc) return;
-
-      // Determine tier name from first ticket line
-      const tierName = booking.tickets?.[0]?.name || 'General';
 
       const { ticketCode, qrToken, qrImage } = await generateTicket(
         {

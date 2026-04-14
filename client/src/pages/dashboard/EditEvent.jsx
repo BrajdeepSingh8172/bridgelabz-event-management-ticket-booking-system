@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ const CATEGORIES = ['Conference', 'Concert', 'Festival', 'Sports', 'Workshop', '
 export default function EditEvent() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [preview, setPreview] = useState(null);
   const { data: event, isLoading: fetching } = useGetEventByIdQuery(id);
   const [updateEvent, { isLoading: updating }] = useUpdateEventMutation();
 
@@ -43,7 +44,9 @@ export default function EditEvent() {
     try {
       const formData = new FormData();
       Object.entries(values).forEach(([k, v]) => {
-        if (v !== undefined && v !== '') formData.append(k, v);
+        if (k.startsWith('_')) return;
+        if (v === undefined || v === '') return;
+        formData.append(k, typeof v === 'boolean' ? String(v) : v);
       });
       const banner = values._bannerFile?.[0];
       if (banner) formData.append('bannerImage', banner);
@@ -90,11 +93,31 @@ export default function EditEvent() {
         </div>
 
         <div>
-          <label className="label">Update Banner Image</label>
-          <input id="evt-banner" type="file" accept="image/*" className="input py-2 text-slate-400 cursor-pointer" {...register('_bannerFile')} />
-          {event?.bannerImage && (
-            <p className="text-xs text-slate-400 mt-2">Current banner will be kept if no new file is selected.</p>
-          )}
+          <label className="label">Banner Image</label>
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            {(preview || event?.bannerImage) && (
+              <div className="w-32 h-20 rounded-xl overflow-hidden bg-surface-border flex-shrink-0 border border-primary-500/30">
+                <img src={preview || event?.bannerImage} alt="Preview" className="w-full h-full object-cover" />
+              </div>
+            )}
+            <div className="flex-1 w-full">
+              <input 
+                id="evt-banner" 
+                type="file" 
+                accept="image/*" 
+                className="input py-2 text-slate-400 cursor-pointer" 
+                {...register('_bannerFile', {
+                  onChange: (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setPreview(URL.createObjectURL(file));
+                  }
+                })} 
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Recommend 1280x720. {event?.bannerImage ? 'Leave empty to keep current image.' : 'Required for first time.'}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

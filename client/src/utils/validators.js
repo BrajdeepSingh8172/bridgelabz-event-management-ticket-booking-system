@@ -30,7 +30,7 @@ export const eventSchema = z.object({
   endDate:     z.string().optional(),
   isFeatured:  z.boolean().optional(),
   totalCapacity: z.coerce.number().min(1, 'Capacity must be at least 1').optional(),
-});
+}).passthrough();   // ← keep extra fields like _bannerFile so the submit handler can read them
 
 // ── Checkout / Attendee ───────────────────────────────────────────────────────
 export const checkoutSchema = z.object({

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useGetEventByIdQuery } from '../../features/events/eventsApi';
+import { useDispatch } from 'react-redux';
+import { useGetEventByIdQuery, eventsApi } from '../../features/events/eventsApi';
 import axiosClient from '../../api/axiosClient';
 import Button from '../../components/ui/Button';
 import Input  from '../../components/ui/Input';
@@ -12,6 +13,7 @@ import { PlusIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 
 export default function ManageTickets() {
   const { id } = useParams();
+  const dispatch = useDispatch();
   const { data: eventResp, isLoading: isLoadingEvent } = useGetEventByIdQuery(id);
   const [tickets, setTickets] = useState([]);
   const [isLoadingTickets, setIsLoadingTickets] = useState(true);
@@ -73,6 +75,8 @@ export default function ManageTickets() {
       }
       fetchTickets();
       handleCloseModal();
+      // Invalidate event cache so detail page shows fresh tickets
+      dispatch(eventsApi.util.invalidateTags([{ type: 'Event', id }, 'Event']));
     } catch (err) {
       toast.error(err?.response?.data?.message ?? 'Failed to save ticket');
     } finally {
@@ -86,6 +90,7 @@ export default function ManageTickets() {
       await axiosClient.delete(`/api/tickets/${ticketId}`);
       toast.success('Ticket deleted');
       fetchTickets();
+      dispatch(eventsApi.util.invalidateTags([{ type: 'Event', id }, 'Event']));
     } catch {
       toast.error('Failed to delete ticket');
     }

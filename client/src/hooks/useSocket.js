@@ -20,18 +20,18 @@ export function useSocket() {
     });
 
     // Real-time ticket seat update
-    socket.on('ticketUpdate', ({ eventId, ticketTypeId, remaining }) => {
+    socket.on('ticketUpdate', ({ eventId, ticketTypeId, soldQuantity }) => {
       dispatch(
         eventsApi.util.updateQueryData('getEventById', eventId, (draft) => {
           if (!draft) return;
-          const tickets = draft.tickets || draft.ticketTypes || [];
+          const tickets = draft.ticketTypes || draft.tickets || [];
           const tkt = tickets.find(
             (t) => t._id === ticketTypeId || String(t._id) === String(ticketTypeId),
           );
-          if (tkt) tkt.remaining = remaining;
+          if (tkt) tkt.soldQuantity = soldQuantity;
         }),
       );
-    });
+    }),
 
     socket.on('disconnect', () => {
       console.log('[Socket] disconnected');
