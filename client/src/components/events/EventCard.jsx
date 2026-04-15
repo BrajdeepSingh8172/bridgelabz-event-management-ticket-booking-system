@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { CalendarDaysIcon, MapPinIcon, TicketIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, MapPinIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '../../utils/formatDate';
-import { formatCurrency } from '../../utils/formatCurrency';
+import { getEventPriceDisplay } from '../../utils/cancellationPolicy';
 import Badge from '../ui/Badge';
 
 const categoryColors = {
@@ -18,16 +18,14 @@ const categoryColors = {
 export default function EventCard({ event }) {
   if (!event) return null;
 
-  // Use ticket types if available (detail page), otherwise fall back to event-level capacity
-  const hasTicketTypes = event.ticketTypes?.length > 0;
+  // Price display — use utility that handles mixed free/paid tiers correctly
+  const priceDisplay = getEventPriceDisplay(event);
 
-  const minPrice = hasTicketTypes
-    ? Math.min(...event.ticketTypes.map((t) => t.price))
-    : 0; // events without tickets are free to browse
+  // Remaining seats: prefer ticket-level data, fall back to event totalCapacity - soldCount
+  const hasTicketTypes = event.ticketTypes?.length > 0;
 
   const color = categoryColors[event.category?.toLowerCase()] ?? categoryColors.default;
 
-  // Remaining seats: prefer ticket-level data, fall back to event totalCapacity - soldCount
   const totalRemaining = hasTicketTypes
     ? event.ticketTypes.reduce((s, t) => s + (t.totalQuantity - (t.soldQuantity ?? 0)), 0)
     : Math.max(0, (event.totalCapacity ?? 0) - (event.soldCount ?? 0));
@@ -94,7 +92,7 @@ export default function EventCard({ event }) {
             </span>
           </div>
           <span className="font-display font-bold text-primary-300 text-sm">
-            {minPrice === 0 ? 'Free' : `from ${formatCurrency(minPrice)}`}
+            {priceDisplay}
           </span>
         </div>
       </div>

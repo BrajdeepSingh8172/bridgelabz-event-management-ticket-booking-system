@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useGetPendingCancellationsQuery } from '../../features/bookings/bookingsApi';
 import {
   Squares2X2Icon,
   CalendarDaysIcon,
@@ -8,23 +9,36 @@ import {
   UsersIcon,
   ShieldCheckIcon,
   XMarkIcon,
+  ReceiptRefundIcon,
+  TicketIcon,
 } from '@heroicons/react/24/outline';
 
 const organizerLinks = [
+  { to: '/profile',              icon: TicketIcon,       label: 'My Bookings'    },
   { to: '/dashboard',            icon: Squares2X2Icon,   label: 'Overview'       },
   { to: '/dashboard/events',     icon: CalendarDaysIcon, label: 'My Events'      },
   { to: '/dashboard/events/new', icon: PlusCircleIcon,   label: 'Create Event'   },
   { to: '/dashboard/scanner',    icon: QrCodeIcon,       label: 'QR Scanner'     },
 ];
 
-const adminLinks = [
-  { to: '/admin',         icon: ShieldCheckIcon, label: 'Admin Overview' },
-  { to: '/admin/users',   icon: UsersIcon,       label: 'Manage Users'   },
-  { to: '/admin/events',  icon: CalendarDaysIcon, label: 'Manage Events' },
+const staticAdminLinks = [
+  { to: '/admin',                  icon: ShieldCheckIcon,    label: 'Admin Overview'       },
+  { to: '/admin/users',            icon: UsersIcon,          label: 'Manage Users'         },
+  { to: '/admin/events',           icon: CalendarDaysIcon,   label: 'Manage Events'        },
+  { to: '/admin/cancellations',    icon: ReceiptRefundIcon,  label: 'Cancellation Requests', badge: true },
 ];
 
 export default function Sidebar({ onClose }) {
   const { isAdmin, isOrganizer } = useAuth();
+
+  // Fetch pending cancellations count for admin badge (skip if not admin)
+  const { data: pendingRequests } = useGetPendingCancellationsQuery(undefined, {
+    skip: !isAdmin,
+    pollingInterval: 60000, // refresh every 60s
+  });
+  const pendingCount = pendingRequests?.length ?? 0;
+
+  const adminLinks = staticAdminLinks;
   const links = isAdmin ? [...organizerLinks, ...adminLinks] : organizerLinks;
 
   return (
@@ -39,7 +53,7 @@ export default function Sidebar({ onClose }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        {links.map(({ to, icon: Icon, label }) => (
+        {links.map(({ to, icon: Icon, label, badge }) => (
           <NavLink
             key={to}
             to={to}
@@ -53,10 +67,16 @@ export default function Sidebar({ onClose }) {
             }
           >
             <Icon className="w-5 h-5 flex-shrink-0" />
-            {label}
+            <span className="flex-1">{label}</span>
+            {badge && pendingCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+                {pendingCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
     </aside>
   );
 }
+

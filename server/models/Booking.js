@@ -67,6 +67,29 @@ const bookingSchema = new mongoose.Schema(
       type: attendeeInfoSchema,
       default: {},
     },
+
+    // ── Cancellation & Refund Fields ────────────────────────────────────────────
+    cancellationStatus: {
+      type: String,
+      enum: ['none', 'requested', 'approved', 'rejected'],
+      default: 'none',
+    },
+    cancellationRequestedAt: { type: Date, default: null },
+    cancellationReason:      { type: String, default: '' },
+    cancellationApprovedAt:  { type: Date, default: null },
+    cancellationApprovedBy:  {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    refundAmount:  { type: Number, default: 0 },
+    refundPercent: { type: Number, default: 0 },
+    refundStatus: {
+      type: String,
+      enum: ['none', 'pending', 'processed'],
+      default: 'none',
+    },
+    refundInitiatedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

@@ -167,4 +167,150 @@ const sendEmail = async ({ to, subject, html }) => {
   });
 };
 
-module.exports = { sendBookingConfirmation, sendEmail };
+// ── Cancellation Email Templates ──────────────────────────────────────────────
+
+/**
+ * Sends a cancellation request notification to the admin.
+ */
+const sendCancellationRequestToAdmin = async ({ booking, user, event, refundAmount, refundPercent, hoursUntilEvent }) => {
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+
+  await transporter.sendMail({
+    from:    process.env.EMAIL_FROM,
+    to:      adminEmail,
+    subject: `Cancellation Request — ${event.title} — ${user.name}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <div style="background:#0A1931;padding:24px;text-align:center">
+          <h1 style="color:#00B4D8;margin:0">EventHub Admin</h1>
+          <p style="color:#94a3b8;margin:8px 0 0">Cancellation Request Received</p>
+        </div>
+        <div style="padding:24px;background:#f9f9f9">
+          <h2 style="color:#dc2626">New Cancellation Request</h2>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr style="background:#e8f4fd"><td style="padding:10px;font-weight:bold">User</td><td style="padding:10px">${user.name} (${user.email})</td></tr>
+            <tr><td style="padding:10px;font-weight:bold">Event</td><td style="padding:10px">${event.title}</td></tr>
+            <tr style="background:#e8f4fd"><td style="padding:10px;font-weight:bold">Booking Ref</td><td style="padding:10px;font-family:monospace">${booking.bookingRef}</td></tr>
+            <tr><td style="padding:10px;font-weight:bold">Booking Amount</td><td style="padding:10px">₹${booking.totalAmount}</td></tr>
+            <tr style="background:#e8f4fd"><td style="padding:10px;font-weight:bold">Refund Eligible</td><td style="padding:10px;color:#16a34a;font-weight:bold">₹${refundAmount} (${refundPercent}%)</td></tr>
+            <tr><td style="padding:10px;font-weight:bold">Hours Until Event</td><td style="padding:10px">${hoursUntilEvent} hours</td></tr>
+            <tr style="background:#e8f4fd"><td style="padding:10px;font-weight:bold">Reason</td><td style="padding:10px">${booking.cancellationReason}</td></tr>
+            <tr><td style="padding:10px;font-weight:bold">Requested At</td><td style="padding:10px">${new Date().toLocaleString('en-IN')}</td></tr>
+          </table>
+          <div style="text-align:center;margin:24px 0">
+            <p style="font-size:16px;font-weight:bold;margin-bottom:16px">Take Action:</p>
+            <a href="${process.env.CLIENT_URL}/admin/cancellations"
+              style="background:#16a34a;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:bold;display:inline-block;margin-right:12px">
+              ✓ Review Request
+            </a>
+          </div>
+          <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px;margin-top:16px">
+            <p style="margin:0;color:#92400e;font-size:13px">
+              <strong>Refund Policy:</strong> User requested ${hoursUntilEvent}h before event.
+              Eligible for ${refundPercent}% refund = ₹${refundAmount}.
+              Please review and approve or reject within 24 hours.
+            </p>
+          </div>
+        </div>
+        <div style="background:#0A1931;padding:12px;text-align:center">
+          <p style="color:#94a3b8;margin:0;font-size:12px">EventHub Admin Panel — Brajdeep Singh</p>
+        </div>
+      </div>
+    `,
+  });
+};
+
+/**
+ * Sends a cancellation approved email to the user with refund details.
+ */
+const sendCancellationApprovedEmail = async ({ user, event, booking, refundAmount, refundPercent }) => {
+  await transporter.sendMail({
+    from:    process.env.EMAIL_FROM,
+    to:      user.email,
+    subject: `Cancellation Approved — Refund of ₹${refundAmount} Initiated — ${event.title}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <div style="background:#0A1931;padding:24px;text-align:center">
+          <h1 style="color:#00B4D8;margin:0">EventHub</h1>
+        </div>
+        <div style="padding:24px;background:#f9f9f9">
+          <div style="background:#dcfce7;border:2px solid #16a34a;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
+            <h2 style="color:#16a34a;margin:0">✓ Cancellation Approved</h2>
+            <p style="color:#15803d;margin:8px 0 0">Your refund has been initiated</p>
+          </div>
+          <p style="font-size:16px">Hi <strong>${user.name}</strong>,</p>
+          <p>Your cancellation request for <strong>${event.title}</strong> has been approved by our admin team.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr style="background:#e8f4fd"><td style="padding:10px;font-weight:bold">Booking Ref</td><td style="padding:10px;font-family:monospace">${booking.bookingRef}</td></tr>
+            <tr><td style="padding:10px;font-weight:bold">Event</td><td style="padding:10px">${event.title}</td></tr>
+            <tr style="background:#e8f4fd"><td style="padding:10px;font-weight:bold">Original Amount</td><td style="padding:10px">₹${booking.totalAmount}</td></tr>
+            <tr><td style="padding:10px;font-weight:bold">Refund Amount</td><td style="padding:10px;color:#16a34a;font-weight:bold;font-size:18px">₹${refundAmount} (${refundPercent}%)</td></tr>
+            <tr style="background:#e8f4fd"><td style="padding:10px;font-weight:bold">Refund Status</td><td style="padding:10px;color:#16a34a">Processing</td></tr>
+            <tr><td style="padding:10px;font-weight:bold">Cancellation Date</td><td style="padding:10px">${new Date().toLocaleString('en-IN')}</td></tr>
+          </table>
+          <div style="background:#dbeafe;border:1px solid #3b82f6;border-radius:8px;padding:16px;margin:16px 0">
+            <h3 style="color:#1e40af;margin:0 0 8px">Refund Timeline</h3>
+            <p style="color:#1e40af;margin:0">Your refund of <strong>₹${refundAmount}</strong> will be credited to your original payment method within <strong>7 business days</strong>.</p>
+            <ul style="color:#1e40af;margin:8px 0 0;padding-left:20px">
+              <li>Credit/Debit Card: 5-7 business days</li>
+              <li>UPI: 2-3 business days</li>
+              <li>Net Banking: 5-7 business days</li>
+              <li>Wallet: 1-2 business days</li>
+            </ul>
+          </div>
+          <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px">
+            <p style="margin:0;color:#92400e;font-size:13px">
+              If you do not receive the refund within 7 business days, please contact us at ${process.env.EMAIL_USER}
+            </p>
+          </div>
+        </div>
+        <div style="background:#0A1931;padding:12px;text-align:center">
+          <p style="color:#94a3b8;margin:0;font-size:12px">Built with love by Brajdeep Singh — EventHub 2026</p>
+        </div>
+      </div>
+    `,
+  });
+};
+
+/**
+ * Sends a cancellation rejected email to the user.
+ */
+const sendCancellationRejectedEmail = async ({ user, event, booking, reason }) => {
+  await transporter.sendMail({
+    from:    process.env.EMAIL_FROM,
+    to:      user.email,
+    subject: `Cancellation Request Rejected — ${event.title}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <div style="background:#0A1931;padding:24px;text-align:center">
+          <h1 style="color:#00B4D8;margin:0">EventHub</h1>
+        </div>
+        <div style="padding:24px;background:#f9f9f9">
+          <div style="background:#fee2e2;border:2px solid #dc2626;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
+            <h2 style="color:#dc2626;margin:0">✗ Cancellation Request Rejected</h2>
+          </div>
+          <p>Hi <strong>${user.name}</strong>,</p>
+          <p>Unfortunately, your cancellation request for <strong>${event.title}</strong> has been reviewed and rejected.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr style="background:#e8f4fd"><td style="padding:10px;font-weight:bold">Booking Ref</td><td style="padding:10px;font-family:monospace">${booking.bookingRef}</td></tr>
+            <tr><td style="padding:10px;font-weight:bold">Event</td><td style="padding:10px">${event.title}</td></tr>
+            <tr style="background:#fee2e2"><td style="padding:10px;font-weight:bold">Reason</td><td style="padding:10px;color:#dc2626">${reason}</td></tr>
+          </table>
+          <p>Your booking remains <strong>confirmed</strong>. We look forward to seeing you at the event!</p>
+          <p style="color:#64748b;font-size:13px">If you believe this decision is incorrect, please contact us at ${process.env.EMAIL_USER}</p>
+        </div>
+        <div style="background:#0A1931;padding:12px;text-align:center">
+          <p style="color:#94a3b8;margin:0;font-size:12px">Built with love by Brajdeep Singh — EventHub 2026</p>
+        </div>
+      </div>
+    `,
+  });
+};
+
+module.exports = {
+  sendBookingConfirmation,
+  sendEmail,
+  sendCancellationRequestToAdmin,
+  sendCancellationApprovedEmail,
+  sendCancellationRejectedEmail,
+};

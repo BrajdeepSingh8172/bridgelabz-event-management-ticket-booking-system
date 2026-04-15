@@ -29,6 +29,7 @@ import Profile          from './pages/profile/Profile';
 import AdminDashboard   from './pages/admin/AdminDashboard';
 import ManageUsers      from './pages/admin/ManageUsers';
 import ManageEvents     from './pages/admin/ManageEvents';
+import CancellationRequests from './pages/admin/CancellationRequests';
 
 export default function App() {
   useSessionRestore(); // Silently restore user from token on page reload
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/users" element={<ManageUsers />} />
         <Route path="/admin/events" element={<ManageEvents />} />
+        <Route path="/admin/cancellations" element={<CancellationRequests />} />
       </Route>
     </Routes>
   );

@@ -7,7 +7,7 @@ const User    = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateQR } = require('../services/qrService');
-const { sendBookingConfirmation } = require('../services/emailService');
+const { sendBookingConfirmation, sendCancellationRequestToAdmin, sendCancellationApprovedEmail, sendCancellationRejectedEmail } = require('../services/emailService');
 
 // ── POST /api/bookings ────────────────────────────────────────────────────────
 /**
@@ -257,4 +257,146 @@ const cancelBooking = async (req, res) => {
   }
 };
 
-module.exports = { createBooking, getUserBookings, getBookingById, cancelBooking };
+// ── POST /api/bookings/:bookingId/cancel-request ─────────────────────────────
+/**
+ * User requests cancellation — enforces 48-hour policy and calculates
+ * tiered refund. Sends notification email to admin.
+ */
+const requestCancellation = async (req, res) => {
+  const { bookingId }          = req.params;
+  const { cancellationReason } = req.body;
+
+  const booking = await Booking.findById(bookingId)
+    .populate('event', 'title startDate venue')
+    .populate('user',  'name email');
+
+  if (!booking) throw new ApiError(404, 'Booking not found');
+  if (booking.user._id.toString() !== req.user.id) throw new ApiError(403, 'Not authorized');
+  if (booking.status !== 'confirmed') throw new ApiError(400, 'Only confirmed bookings can be cancelled');
+  if (booking.cancellationStatus === 'requested') throw new ApiError(400, 'Cancellation already requested');
+
+  // Check 48-hour policy
+  const hoursUntilEvent = (new Date(booking.event.startDate) - new Date()) / (1000 * 60 * 60);
+  if (hoursUntilEvent < 48) {
+    throw new ApiError(400, 'Cancellation not allowed within 48 hours of event');
+  }
+
+  // Calculate refund amount based on policy
+  let refundPercent = 100;
+  if (hoursUntilEvent < 168) refundPercent = 75;
+  if (hoursUntilEvent < 72)  refundPercent = 50;
+  const refundAmount = (booking.totalAmount * refundPercent) / 100;
+
+  // Update booking status
+  booking.cancellationStatus      = 'requested';
+  booking.cancellationRequestedAt = new Date();
+  booking.cancellationReason      = cancellationReason || 'No reason provided';
+  booking.refundAmount            = refundAmount;
+  booking.refundPercent           = refundPercent;
+  await booking.save();
+
+  // Send email to ADMIN (non-critical)
+  try {
+    await sendCancellationRequestToAdmin({
+      booking,
+      user:         booking.user,
+      event:        booking.event,
+      refundAmount,
+      refundPercent,
+      hoursUntilEvent: Math.floor(hoursUntilEvent),
+    });
+  } catch (emailErr) {
+    console.error('⚠️  Failed to send cancellation request email to admin:', emailErr.message);
+  }
+
+  res.json(new ApiResponse(200, booking, 'Cancellation request submitted. Admin will review within 24 hours.'));
+};
+
+// ── POST /api/bookings/:bookingId/admin-decision ─────────────────────────────
+/**
+ * Admin approves or rejects a pending cancellation request.
+ * On approval: booking status → cancelled, refundStatus → pending, user emailed.
+ * On rejection: cancellationStatus → rejected, user emailed.
+ */
+const adminApproveCancellation = async (req, res) => {
+  const { bookingId }        = req.params;
+  const { decision, reason } = req.body; // decision: 'approve' or 'reject'
+
+  if (!['approve', 'reject'].includes(decision)) {
+    throw new ApiError(400, 'Decision must be approve or reject');
+  }
+
+  const booking = await Booking.findById(bookingId)
+    .populate('event', 'title startDate venue')
+    .populate('user',  'name email');
+
+  if (!booking) throw new ApiError(404, 'Booking not found');
+  if (booking.cancellationStatus !== 'requested') {
+    throw new ApiError(400, 'No pending cancellation request for this booking');
+  }
+
+  if (decision === 'approve') {
+    booking.status                  = 'cancelled';
+    booking.cancellationStatus      = 'approved';
+    booking.cancellationApprovedAt  = new Date();
+    booking.cancellationApprovedBy  = req.user.id;
+    booking.refundStatus            = 'pending';
+    booking.refundInitiatedAt       = new Date();
+    await booking.save();
+
+    // Send approval email to user with refund details
+    try {
+      await sendCancellationApprovedEmail({
+        user:          booking.user,
+        event:         booking.event,
+        booking,
+        refundAmount:  booking.refundAmount,
+        refundPercent: booking.refundPercent,
+      });
+    } catch (emailErr) {
+      console.error('⚠️  Failed to send cancellation approved email:', emailErr.message);
+    }
+  } else {
+    booking.cancellationStatus = 'rejected';
+    await booking.save();
+
+    // Send rejection email to user
+    try {
+      await sendCancellationRejectedEmail({
+        user:    booking.user,
+        event:   booking.event,
+        booking,
+        reason:  reason || 'Request reviewed and denied by admin',
+      });
+    } catch (emailErr) {
+      console.error('⚠️  Failed to send cancellation rejected email:', emailErr.message);
+    }
+  }
+
+  res.json(new ApiResponse(200, booking,
+    decision === 'approve' ? 'Cancellation approved and refund initiated' : 'Cancellation request rejected'
+  ));
+};
+
+// ── GET /api/bookings/cancellation-requests ──────────────────────────────────
+/**
+ * Admin-only: fetches all bookings with cancellationStatus === 'requested'.
+ */
+const getPendingCancellations = async (req, res) => {
+  const pending = await Booking.find({ cancellationStatus: 'requested' })
+    .populate('user',  'name email avatar')
+    .populate('event', 'title startDate venue')
+    .sort({ cancellationRequestedAt: -1 });
+
+  res.json(new ApiResponse(200, pending, 'Pending cancellation requests'));
+};
+
+module.exports = {
+  createBooking,
+  getUserBookings,
+  getBookingById,
+  cancelBooking,
+  requestCancellation,
+  adminApproveCancellation,
+  getPendingCancellations,
+};

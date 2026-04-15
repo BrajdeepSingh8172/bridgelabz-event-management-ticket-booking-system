@@ -13,7 +13,7 @@ export const bookingsApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Booking'],
+  tagTypes: ['Booking', 'CancellationRequest'],
   endpoints: (build) => ({
     createBooking: build.mutation({
       query: (body) => ({ url: '/', method: 'POST', body }),
@@ -35,6 +35,36 @@ export const bookingsApi = createApi({
       transformResponse: (res) => res.data || res,
       invalidatesTags: ['Booking'],
     }),
+
+    // ── Cancellation workflow ──────────────────────────────────────────────────
+    /** User requests cancellation with optional reason */
+    requestCancellation: build.mutation({
+      query: ({ bookingId, cancellationReason }) => ({
+        url: `/${bookingId}/cancel-request`,
+        method: 'POST',
+        body: { cancellationReason },
+      }),
+      transformResponse: (res) => res.data || res,
+      invalidatesTags: ['Booking'],
+    }),
+
+    /** Admin fetches all pending cancellation requests */
+    getPendingCancellations: build.query({
+      query: () => '/cancellation-requests',
+      transformResponse: (res) => res.data || res,
+      providesTags: ['CancellationRequest'],
+    }),
+
+    /** Admin approves or rejects a cancellation request */
+    adminCancellationDecision: build.mutation({
+      query: ({ bookingId, decision, reason }) => ({
+        url: `/${bookingId}/admin-decision`,
+        method: 'POST',
+        body: { decision, reason },
+      }),
+      transformResponse: (res) => res.data || res,
+      invalidatesTags: ['Booking', 'CancellationRequest'],
+    }),
   }),
 });
 
@@ -43,4 +73,7 @@ export const {
   useGetUserBookingsQuery,
   useGetBookingByIdQuery,
   useCancelBookingMutation,
+  useRequestCancellationMutation,
+  useGetPendingCancellationsQuery,
+  useAdminCancellationDecisionMutation,
 } = bookingsApi;
