@@ -142,9 +142,39 @@ const validateTicket = async (req, res) => {
     )
       .populate('event',   'title startDate venue')
       .populate('user',    'name email')
-      .populate('booking', 'bookingRef');
+      .populate('booking', 'bookingRef status cancellationStatus refundStatus');
 
     if (ticket) {
+      // ── CHECK FOR CANCELLED BOOKING ─────────────────────────────────────────
+      if (ticket.booking?.status === 'cancelled') {
+        // Rollback the isUsed since we won't actually admit them
+        await IssuedTicket.findByIdAndUpdate(ticket._id, { 
+          $set: { isUsed: false }, 
+          usedAt: null, 
+          usedBy: null,
+          $push: {
+            scanLog: {
+              scannedAt: new Date(),
+              scannedBy: scannerId,
+              ipAddress: scannerIp,
+              result:    'cancelled',
+            },
+          },
+        }, { session });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.status(400).json(
+          new ApiResponse(400, { 
+            result: 'cancelled',
+            bookingRef: ticket.booking?.bookingRef,
+            refundStatus: ticket.booking?.refundStatus,
+            cancellationStatus: ticket.booking?.cancellationStatus
+          }, '🚫 Ticket Cancelled — This booking was cancelled or refunded and cannot be used for entry.')
+        );
+      }
+
       // ✅ SUCCESS — entry granted
       await session.commitTransaction();
       session.endSession();
@@ -170,12 +200,25 @@ const validateTicket = async (req, res) => {
 
     // Find out why it failed
     const existing = await IssuedTicket.findOne({ ticketCode: decoded.tc })
-      .populate('user', 'name email');
+      .populate('user',    'name email')
+      .populate('booking', 'bookingRef status cancellationStatus refundStatus');
 
     if (!existing) {
       return res.status(404).json(
         new ApiResponse(404, { result: 'invalid' }, 'Ticket not found in system')
       );
+    }
+
+    // ── PRIORITY CHECK: CANCELLED ─────────────────────────────────────────────
+    if (existing.booking?.status === 'cancelled') {
+        return res.status(400).json(
+          new ApiResponse(400, { 
+            result: 'cancelled',
+            bookingRef: existing.booking?.bookingRef,
+            refundStatus: existing.booking?.refundStatus,
+            cancellationStatus: existing.booking?.cancellationStatus
+          }, '🚫 Ticket Cancelled — This booking is inactive.')
+        );
     }
 
     if (existing.paymentStatus !== 'completed') {
