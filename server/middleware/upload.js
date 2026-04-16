@@ -29,6 +29,7 @@ const avatarStorage = new CloudinaryStorage({
 
 /** File-type filter: images only */
 const imageFilter = (_req, file, cb) => {
+  console.log('📁 Multer filter check:', file.originalname, file.mimetype);
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
@@ -38,11 +39,23 @@ const imageFilter = (_req, file, cb) => {
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
-const uploadEventBanner = multer({
+const _uploadEventBanner = multer({
   storage: eventBannerStorage,
   fileFilter: imageFilter,
   limits: { fileSize: MAX_FILE_SIZE },
 }).single('bannerImage');
+
+/** Wrapper: if Cloudinary/multer errors, log and continue without a file */
+const uploadEventBanner = (req, res, next) => {
+  _uploadEventBanner(req, res, (err) => {
+    if (err) {
+      console.error('⚠️  Multer/Cloudinary upload error (continuing without image):', err.message || err);
+      // Don't block event creation — just skip the image
+      req.file = undefined;
+    }
+    next();
+  });
+};
 
 const uploadAvatar = multer({
   storage: avatarStorage,

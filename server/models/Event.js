@@ -56,12 +56,12 @@ const eventSchema = new mongoose.Schema(
     },
     endDate: {
       type: Date,
-      required: [true, 'End date is required'],
+      // Not required — some events are single-day or open-ended
     },
     status: {
       type: String,
       enum: ['draft', 'published', 'cancelled', 'completed'],
-      default: 'draft',
+      default: 'published',  // default published so events are immediately visible
     },
     isFeatured: {
       type: Boolean,

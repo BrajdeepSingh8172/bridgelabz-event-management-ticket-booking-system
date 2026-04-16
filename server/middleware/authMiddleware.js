@@ -42,4 +42,23 @@ const requireRole = (...roles) => (req, _res, next) => {
   next();
 };
 
-module.exports = { verifyToken, requireRole };
+/**
+ * optionalAuth — attaches req.user if a valid Bearer token is present,
+ * but does NOT block the request if there is no token (public routes that
+ * also support authenticated behaviour, e.g. GET /api/events?organizer=me).
+ */
+const optionalAuth = (req, _res, next) => {
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+      req.user = { id: decoded.id, role: decoded.role };
+    } catch (_err) {
+      // Invalid / expired token — treat as unauthenticated
+    }
+  }
+  next();
+};
+
+module.exports = { verifyToken, requireRole, optionalAuth };

@@ -1,12 +1,13 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const Ticket  = require('../models/Ticket');
+const IssuedTicket = require('../models/IssuedTicket');
 const Event   = require('../models/Event');
 const User    = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { generateQR } = require('../services/qrService');
-const { sendBookingConfirmation } = require('../services/emailService');
+const { sendBookingConfirmation, sendCancellationRequestToAdmin, sendCancellationApprovedEmail, sendCancellationRejectedEmail } = require('../services/emailService');
 
 // ── POST /api/bookings ────────────────────────────────────────────────────────
 /**
@@ -98,12 +99,8 @@ const createBooking = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // ── Post-commit: QR + email (non-critical, do not roll back for these) ──
+    // ── Post-commit: email (non-critical, do not roll back) ──
     try {
-      const qrCode = await generateQR(booking.bookingRef);
-      booking.qrCode = qrCode;
-      await booking.save();
-
       const userDoc = attendeeInfo?.email ? null : await User.findById(req.user.id).lean();
       await sendBookingConfirmation({
         to: attendeeInfo?.email || userDoc?.email || '',
@@ -111,9 +108,9 @@ const createBooking = async (req, res) => {
         bookingRef: booking.bookingRef,
         eventTitle: event.title,
         eventDate: event.startDate.toDateString(),
-        venueName: event.venue?.name || '',
+        venueName:    event.venue?.name || '',
         totalAmount,
-        qrCode,
+        eventId:      event._id,
       });
     } catch (emailOrQrErr) {
       console.error('⚠️   Post-booking email/QR error (booking is still saved):', emailOrQrErr.message);
@@ -126,8 +123,8 @@ const createBooking = async (req, res) => {
         const ticket = await Ticket.findById(line.ticket).lean();
         io.to(`event:${eventId}`).emit('ticketUpdate', {
           eventId,
-          ticketId: line.ticket,
-          remainingQuantity: ticket.totalQuantity - ticket.soldQuantity,
+          ticketTypeId: line.ticket,
+          soldQuantity: ticket.soldQuantity,
         });
       }
     }
@@ -151,13 +148,28 @@ const getUserBookings = async (req, res) => {
       .populate('tickets.ticket', 'name type price')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit)),
+      .limit(Number(limit))
+      .lean(),
     Booking.countDocuments({ user: req.user.id }),
   ]);
 
+  // Attach issuedTicket (qrImage + ticketCode) to each booking
+  const bookingIds = bookings.map((b) => b._id);
+  const issuedTickets = await IssuedTicket.find({ booking: { $in: bookingIds } })
+    .select('booking ticketCode qrImage tierName isUsed usedAt')
+    .lean();
+
+  const issuedMap = {};
+  for (const it of issuedTickets) issuedMap[it.booking.toString()] = it;
+
+  const enriched = bookings.map((b) => ({
+    ...b,
+    issuedTicket: issuedMap[b._id.toString()] ?? null,
+  }));
+
   res.json(
     new ApiResponse(200, {
-      bookings,
+      bookings: enriched,
       pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
     }, 'Your bookings fetched')
   );
@@ -168,7 +180,8 @@ const getBookingById = async (req, res) => {
   const booking = await Booking.findById(req.params.id)
     .populate('event', 'title startDate endDate venue bannerImage organizer')
     .populate('tickets.ticket', 'name type price')
-    .populate('user', 'name email avatar');
+    .populate('user', 'name email avatar')
+    .lean();
 
   if (!booking) throw new ApiError(404, 'Booking not found');
 
@@ -180,7 +193,12 @@ const getBookingById = async (req, res) => {
     throw new ApiError(403, 'Not authorized to view this booking');
   }
 
-  res.json(new ApiResponse(200, booking, 'Booking fetched successfully'));
+  // Attach real IssuedTicket (contains JWT-signed qrImage for gate scanning)
+  const issuedTicket = await IssuedTicket.findOne({ booking: booking._id })
+    .select('ticketCode qrImage tierName isUsed usedAt paymentStatus')
+    .lean();
+
+  res.json(new ApiResponse(200, { ...booking, issuedTicket: issuedTicket ?? null }, 'Booking fetched successfully'));
 };
 
 // ── PATCH /api/bookings/:id/cancel ───────────────────────────────────────────
@@ -224,8 +242,8 @@ const cancelBooking = async (req, res) => {
         if (ticket) {
           io.to(`event:${booking.event}`).emit('ticketUpdate', {
             eventId: booking.event,
-            ticketId: line.ticket,
-            remainingQuantity: ticket.totalQuantity - ticket.soldQuantity,
+            ticketTypeId: line.ticket,
+            soldQuantity: ticket.soldQuantity,
           });
         }
       }
@@ -239,4 +257,146 @@ const cancelBooking = async (req, res) => {
   }
 };
 
-module.exports = { createBooking, getUserBookings, getBookingById, cancelBooking };
+// ── POST /api/bookings/:bookingId/cancel-request ─────────────────────────────
+/**
+ * User requests cancellation — enforces 48-hour policy and calculates
+ * tiered refund. Sends notification email to admin.
+ */
+const requestCancellation = async (req, res) => {
+  const { bookingId }          = req.params;
+  const { cancellationReason } = req.body;
+
+  const booking = await Booking.findById(bookingId)
+    .populate('event', 'title startDate venue')
+    .populate('user',  'name email');
+
+  if (!booking) throw new ApiError(404, 'Booking not found');
+  if (booking.user._id.toString() !== req.user.id) throw new ApiError(403, 'Not authorized');
+  if (booking.status !== 'confirmed') throw new ApiError(400, 'Only confirmed bookings can be cancelled');
+  if (booking.cancellationStatus === 'requested') throw new ApiError(400, 'Cancellation already requested');
+
+  // Check 48-hour policy
+  const hoursUntilEvent = (new Date(booking.event.startDate) - new Date()) / (1000 * 60 * 60);
+  if (hoursUntilEvent < 48) {
+    throw new ApiError(400, 'Cancellation not allowed within 48 hours of event');
+  }
+
+  // Calculate refund amount based on policy
+  let refundPercent = 100;
+  if (hoursUntilEvent < 168) refundPercent = 75;
+  if (hoursUntilEvent < 72)  refundPercent = 50;
+  const refundAmount = (booking.totalAmount * refundPercent) / 100;
+
+  // Update booking status
+  booking.cancellationStatus      = 'requested';
+  booking.cancellationRequestedAt = new Date();
+  booking.cancellationReason      = cancellationReason || 'No reason provided';
+  booking.refundAmount            = refundAmount;
+  booking.refundPercent           = refundPercent;
+  await booking.save();
+
+  // Send email to ADMIN (non-critical)
+  try {
+    await sendCancellationRequestToAdmin({
+      booking,
+      user:         booking.user,
+      event:        booking.event,
+      refundAmount,
+      refundPercent,
+      hoursUntilEvent: Math.floor(hoursUntilEvent),
+    });
+  } catch (emailErr) {
+    console.error('⚠️  Failed to send cancellation request email to admin:', emailErr.message);
+  }
+
+  res.json(new ApiResponse(200, booking, 'Cancellation request submitted. Admin will review within 24 hours.'));
+};
+
+// ── POST /api/bookings/:bookingId/admin-decision ─────────────────────────────
+/**
+ * Admin approves or rejects a pending cancellation request.
+ * On approval: booking status → cancelled, refundStatus → pending, user emailed.
+ * On rejection: cancellationStatus → rejected, user emailed.
+ */
+const adminApproveCancellation = async (req, res) => {
+  const { bookingId }        = req.params;
+  const { decision, reason } = req.body; // decision: 'approve' or 'reject'
+
+  if (!['approve', 'reject'].includes(decision)) {
+    throw new ApiError(400, 'Decision must be approve or reject');
+  }
+
+  const booking = await Booking.findById(bookingId)
+    .populate('event', 'title startDate venue')
+    .populate('user',  'name email');
+
+  if (!booking) throw new ApiError(404, 'Booking not found');
+  if (booking.cancellationStatus !== 'requested') {
+    throw new ApiError(400, 'No pending cancellation request for this booking');
+  }
+
+  if (decision === 'approve') {
+    booking.status                  = 'cancelled';
+    booking.cancellationStatus      = 'approved';
+    booking.cancellationApprovedAt  = new Date();
+    booking.cancellationApprovedBy  = req.user.id;
+    booking.refundStatus            = 'pending';
+    booking.refundInitiatedAt       = new Date();
+    await booking.save();
+
+    // Send approval email to user with refund details
+    try {
+      await sendCancellationApprovedEmail({
+        user:          booking.user,
+        event:         booking.event,
+        booking,
+        refundAmount:  booking.refundAmount,
+        refundPercent: booking.refundPercent,
+      });
+    } catch (emailErr) {
+      console.error('⚠️  Failed to send cancellation approved email:', emailErr.message);
+    }
+  } else {
+    booking.cancellationStatus = 'rejected';
+    await booking.save();
+
+    // Send rejection email to user
+    try {
+      await sendCancellationRejectedEmail({
+        user:    booking.user,
+        event:   booking.event,
+        booking,
+        reason:  reason || 'Request reviewed and denied by admin',
+      });
+    } catch (emailErr) {
+      console.error('⚠️  Failed to send cancellation rejected email:', emailErr.message);
+    }
+  }
+
+  res.json(new ApiResponse(200, booking,
+    decision === 'approve' ? 'Cancellation approved and refund initiated' : 'Cancellation request rejected'
+  ));
+};
+
+// ── GET /api/bookings/cancellation-requests ──────────────────────────────────
+/**
+ * Admin-only: fetches all bookings with cancellationStatus === 'requested'.
+ */
+const getPendingCancellations = async (req, res) => {
+  const pending = await Booking.find({ cancellationStatus: 'requested' })
+    .populate('user',  'name email avatar')
+    .populate('event', 'title startDate venue')
+    .sort({ cancellationRequestedAt: -1 });
+
+  res.json(new ApiResponse(200, pending, 'Pending cancellation requests'));
+};
+
+module.exports = {
+  createBooking,
+  getUserBookings,
+  getBookingById,
+  cancelBooking,
+  requestCancellation,
+  adminApproveCancellation,
+  getPendingCancellations,
+};

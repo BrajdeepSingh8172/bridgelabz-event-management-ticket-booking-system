@@ -4,9 +4,31 @@ const ApiResponse = require('../utils/ApiResponse');
 
 // ── POST /api/events ──────────────────────────────────────────────────────────
 const createEvent = async (req, res) => {
-  const body = { ...req.body, organizer: req.user.id };
+  console.log('📝 CREATE EVENT - Body:', req.body);
+  console.log('📸 CREATE EVENT - File:', req.file);
+  const body = { 
+    ...req.body, 
+    organizer: req.user.id,
+    // Default to 'published' so events are immediately visible
+    status: req.body.status || 'published',
+    venue: {
+      name: req.body.venueName || req.body.venue,
+      address: req.body.address || 'TBD',
+      city: req.body.city || 'TBD',
+      country: req.body.country || 'India',
+    },
+    totalCapacity: Number(req.body.totalCapacity) || 100,
+    // FormData sends booleans as strings — parse explicitly
+    isFeatured: req.body.isFeatured === 'true' || req.body.isFeatured === true,
+  };
 
-  if (req.file?.path) body.bannerImage = req.file.path; // Cloudinary URL
+  // Cloudinary URL from multer-storage-cloudinary
+  if (req.file?.path) {
+    body.bannerImage = req.file.path;
+    console.log('✅ Image uploaded to Cloudinary:', req.file.path);
+  } else {
+    console.log('ℹ️  No image file received (req.file is', req.file, ')');
+  }
 
   const event = await Event.create(body);
   res.status(201).json(new ApiResponse(201, event, 'Event created successfully'));
@@ -19,18 +41,29 @@ const getEvents = async (req, res) => {
     limit = 12,
     category,
     city,
-    status = 'published',
+    status,
     startDate,
     endDate,
     search,
     sortBy = 'startDate',
     order = 'asc',
+    organizer,
   } = req.query;
 
   const filter = {};
 
+  // If filtering by organizer 'me', resolve to the logged-in user's id
+  // and show ALL their events regardless of status
+  if (organizer === 'me') {
+    if (!req.user) throw new ApiError(401, 'Authentication required');
+    filter.organizer = req.user.id;
+    // Do NOT apply a default status filter for the organizer's own events
+  } else {
+    // For the public listing, default to showing only published events
+    filter.status = status || 'published';
+  }
+
   if (category) filter.category = category;
-  if (status)   filter.status = status;
   if (city)     filter['venue.city'] = { $regex: city, $options: 'i' };
   if (search)   filter.title = { $regex: search, $options: 'i' };
   if (startDate || endDate) {
@@ -82,11 +115,23 @@ const getEventById = async (req, res) => {
     .populate('organizer', 'name email avatar');
 
   if (!event) throw new ApiError(404, 'Event not found');
-  res.json(new ApiResponse(200, event, 'Event fetched successfully'));
+
+  // Fetch tickets for this event
+  const Ticket = require('../models/Ticket');
+  const ticketTypes = await Ticket.find({ event: req.params.id }).lean();
+
+  const eventData = {
+    ...event.toObject(),
+    ticketTypes
+  };
+
+  res.json(new ApiResponse(200, eventData, 'Event fetched successfully'));
 };
 
 // ── PUT /api/events/:id ───────────────────────────────────────────────────────
 const updateEvent = async (req, res) => {
+  console.log('📝 UPDATE EVENT - Body:', req.body);
+  console.log('📸 UPDATE EVENT - File:', req.file);
   const event = await Event.findById(req.params.id);
   if (!event) throw new ApiError(404, 'Event not found');
 
@@ -100,7 +145,18 @@ const updateEvent = async (req, res) => {
 
   if (req.file?.path) req.body.bannerImage = req.file.path;
 
-  const updated = await Event.findByIdAndUpdate(req.params.id, req.body, {
+  const updates = { ...req.body };
+  if (req.body.venue || req.body.city) {
+    updates.venue = {
+      name: req.body.venueName || req.body.venue || event.venue.name,
+      address: req.body.address || event.venue.address || 'TBD',
+      city: req.body.city || event.venue.city || 'TBD',
+      country: req.body.country || event.venue.country || 'India',
+    };
+  }
+  if (req.body.totalCapacity) updates.totalCapacity = Number(req.body.totalCapacity);
+
+  const updated = await Event.findByIdAndUpdate(req.params.id, updates, {
     new: true,
     runValidators: true,
   }).populate('organizer', 'name email avatar');
