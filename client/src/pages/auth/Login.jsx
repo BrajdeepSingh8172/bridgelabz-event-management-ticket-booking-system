@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useForm }   from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '../../utils/validators';
 import { useLoginMutation } from '../../features/auth/authApi';
@@ -7,45 +7,57 @@ import { useDispatch } from 'react-redux';
 import { setCredentials } from '../../features/auth/authSlice';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import Input  from '../../components/ui/Input';
+import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
-import toast  from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { CalendarDaysIcon } from '@heroicons/react/24/outline';
 
 export default function Login() {
-  const dispatch  = useDispatch();
-  const navigate  = useNavigate();
-  const [params]  = useSearchParams();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { isAuth } = useAuth();
-  const nextPath  = params.get('next') || '/';
+  const nextPath = params.get('next') || '/';
 
   const [loginApi, { isLoading }] = useLoginMutation();
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
     resolver: zodResolver(loginSchema),
   });
 
+  // Redirect if already logged in
   useEffect(() => {
     if (isAuth) navigate(nextPath, { replace: true });
   }, [isAuth, navigate, nextPath]);
 
+  // Google error handler
   useEffect(() => {
-    if (params.get('error')) toast.error('Google sign-in failed. Please try again.');
+    if (params.get('error')) {
+      toast.error('Google sign-in failed. Please try again.');
+    }
   }, [params]);
 
+  // Normal login
   const onSubmit = async (values) => {
     try {
       const data = await loginApi(values).unwrap();
-      // data is now { user, accessToken } (ApiResponse.data unwrapped)
+
       const rawUser = data.user ?? data;
+
       const user = {
-        id:     rawUser._id ?? rawUser.id,
-        name:   rawUser.name,
-        email:  rawUser.email,
-        role:   rawUser.role,
+        id: rawUser._id ?? rawUser.id,
+        name: rawUser.name,
+        email: rawUser.email,
+        role: rawUser.role,
         avatar: rawUser.avatar ?? null,
       };
+
       dispatch(setCredentials({ accessToken: data.accessToken, user }));
+
       toast.success(`Welcome back, ${user.name}!`);
       navigate(nextPath, { replace: true });
     } catch (err) {
@@ -53,21 +65,28 @@ export default function Login() {
     }
   };
 
-  const googleUrl = `${import.meta.env.VITE_API_URL}/api/auth/google`;
+  // ✅ FIXED GOOGLE URL
+  const googleUrl = `${import.meta.env.VITE_API_URL}/api/v1/auth/google`;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-hero-glow bg-surface">
       <div className="w-full max-w-md animate-slide-up">
+
         {/* Logo */}
         <div className="flex flex-col items-center mb-8 gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center shadow-glow">
             <CalendarDaysIcon className="w-6 h-6 text-white" />
           </div>
-          <h1 className="font-display font-bold text-2xl gradient-text">Welcome back</h1>
-          <p className="text-slate-400 text-sm">Sign in to your EventHub account</p>
+          <h1 className="font-display font-bold text-2xl gradient-text">
+            Welcome back
+          </h1>
+          <p className="text-slate-400 text-sm">
+            Sign in to your EventHub account
+          </p>
         </div>
 
         <div className="glass p-8 space-y-5">
+
           {/* Google OAuth */}
           <a
             href={googleUrl}
@@ -89,6 +108,7 @@ export default function Login() {
             <div className="flex-1 h-px bg-surface-border" />
           </div>
 
+          {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <Input
               id="login-email"
@@ -99,6 +119,7 @@ export default function Login() {
               error={errors.email?.message}
               {...register('email')}
             />
+
             <Input
               id="login-password"
               label="Password"
@@ -108,6 +129,7 @@ export default function Login() {
               error={errors.password?.message}
               {...register('password')}
             />
+
             <Button type="submit" loading={isLoading} className="w-full btn-lg btn-primary">
               Sign In
             </Button>
@@ -119,6 +141,7 @@ export default function Login() {
               Sign up
             </Link>
           </p>
+
         </div>
       </div>
     </div>
