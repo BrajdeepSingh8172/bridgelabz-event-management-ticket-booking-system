@@ -1,31 +1,45 @@
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const { cloudinary } = require('../config/cloudinary');
 const ApiError = require('../utils/ApiError');
 
 /**
- * Cloudinary storage for event banner images.
+ * Custom Multer storage engine for Cloudinary v2
  */
-const eventBannerStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'event-management/events',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-    transformation: [{ width: 1280, height: 720, crop: 'fill' }],
+const createCloudinaryStorage = (folder, transformation) => ({
+  _handleFile(_req, file, cb) {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation,
+      },
+      (error, result) => {
+        if (error) return cb(error);
+        cb(null, {
+          path: result.secure_url,
+          filename: result.public_id,
+          size: result.bytes,
+        });
+      }
+    );
+    file.stream.pipe(uploadStream);
+  },
+
+  _removeFile(_req, file, cb) {
+    cloudinary.uploader.destroy(file.filename, cb);
   },
 });
 
-/**
- * Cloudinary storage for user avatars.
- */
-const avatarStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'event-management/avatars',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-    transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
-  },
-});
+/** Storage configs */
+const eventBannerStorage = createCloudinaryStorage(
+  'event-management/events',
+  [{ width: 1280, height: 720, crop: 'fill' }]
+);
+
+const avatarStorage = createCloudinaryStorage(
+  'event-management/avatars',
+  [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }]
+);
 
 /** File-type filter: images only */
 const imageFilter = (_req, file, cb) => {
@@ -50,7 +64,6 @@ const uploadEventBanner = (req, res, next) => {
   _uploadEventBanner(req, res, (err) => {
     if (err) {
       console.error('⚠️  Multer/Cloudinary upload error (continuing without image):', err.message || err);
-      // Don't block event creation — just skip the image
       req.file = undefined;
     }
     next();
