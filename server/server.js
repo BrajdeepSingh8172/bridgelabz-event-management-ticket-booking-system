@@ -42,8 +42,8 @@ const start = async () => {
   await connectDB();
   connectRedis(); // non-blocking — server starts even if Redis is down
 
-  httpServer.listen(PORT, () => {
-    console.log(`🚀  Server running on http://localhost:${PORT} [${process.env.NODE_ENV}]`);
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀  Server running on port ${PORT} [${process.env.NODE_ENV}]`);
   });
 };
 
