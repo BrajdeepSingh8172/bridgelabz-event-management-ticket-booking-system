@@ -9,7 +9,7 @@ const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = requir
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
 };
 
@@ -93,7 +93,7 @@ const logout = async (req, res) => {
     }
   }
 
-  res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
+  res.clearCookie('refreshToken', { httpOnly: true, sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', secure: process.env.NODE_ENV === 'production' });
   res.json(new ApiResponse(200, null, 'Logged out successfully'));
 };
 
