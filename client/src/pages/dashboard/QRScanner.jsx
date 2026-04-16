@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useValidateTicketMutation } from '../../features/tickets/ticketsApi';
 import {
@@ -8,6 +9,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
   StopIcon,
+  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -47,6 +49,13 @@ const RESULT_CONFIG = {
     iconColor: 'text-amber-400',
     badge:     'bg-amber-500',
     title:     '💳 Payment Incomplete',
+  },
+  cancelled: {
+    icon:      StopIcon,
+    bg:        'bg-indigo-500/15 border-indigo-500/50',
+    iconColor: 'text-indigo-400',
+    badge:     'bg-indigo-500',
+    title:     '🚫 Ticket Cancelled',
   },
   error: {
     icon:      ExclamationTriangleIcon,
@@ -94,8 +103,9 @@ export default function QRScanner() {
       const resultKey = json.data?.result ?? (
         json.statusCode === 200 ? 'valid' :
         json.statusCode === 409 ? 'already_used' :
-        json.message?.toLowerCase().includes('expired') ? 'expired' :
-        json.message?.toLowerCase().includes('unpaid')  ? 'unpaid'  :
+        json.message?.toLowerCase().includes('cancelled') ? 'cancelled' :
+        json.message?.toLowerCase().includes('expired')   ? 'expired' :
+        json.message?.toLowerCase().includes('unpaid')    ? 'unpaid'  :
         'invalid'
       );
 
@@ -104,14 +114,16 @@ export default function QRScanner() {
 
       if (resultKey === 'valid') toast.success('Entry granted!', { icon: '✅' });
       else if (resultKey === 'already_used') toast.error('Ticket already used!', { icon: '🚫' });
+      else if (resultKey === 'cancelled') toast.error('Ticket deactivated (cancelled)', { icon: '🚫' });
       else toast.error(json.message || 'Invalid ticket');
 
     } catch (err) {
       const errBody = err?.data;
       const resultKey = errBody?.data?.result ?? (
         err?.status === 409 ? 'already_used' :
-        errBody?.message?.toLowerCase().includes('expired') ? 'expired' :
-        errBody?.message?.toLowerCase().includes('unpaid')  ? 'unpaid'  :
+        errBody?.message?.toLowerCase().includes('cancelled') ? 'cancelled' :
+        errBody?.message?.toLowerCase().includes('expired')   ? 'expired' :
+        errBody?.message?.toLowerCase().includes('unpaid')    ? 'unpaid'  :
         'invalid'
       );
       setResult({ resultKey, message: errBody?.message || err?.message || 'Validation error', data: errBody?.data });
@@ -227,6 +239,47 @@ export default function QRScanner() {
                 {d.eventName   && <Row label="Event"     value={d.eventName}   />}
                 {d.bookingRef  && <Row label="Booking #" value={d.bookingRef}   />}
                 {d.usedAt      && <Row label="Entry at"  value={new Date(d.usedAt).toLocaleTimeString('en-IN')} />}
+              </div>
+            )}
+
+            {result.resultKey === 'cancelled' && (
+              <div className="mt-4 space-y-4">
+                {/* Support Agent Script / Stats */}
+                <div className="bg-black/20 p-4 rounded-xl border border-indigo-500/30">
+                  <h4 className="text-indigo-300 font-bold text-xs uppercase tracking-wider mb-2">Gate Agent Guidance</h4>
+                  <p className="text-white text-sm leading-relaxed mb-3 italic">
+                    "I'm sorry, but this ticket has been cancelled and deactivated. The QR code is no longer valid for entry."
+                  </p>
+                  
+                  <div className="grid grid-cols-1 gap-2 text-sm">
+                    {d.refundStatus && (
+                      <div className="flex justify-between items-center py-1 border-b border-indigo-500/20">
+                        <span className="text-slate-400">Refund Status</span>
+                        <span className="text-indigo-400 font-semibold uppercase">{d.refundStatus}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-slate-400">Booking Ref</span>
+                      <span className="text-white font-mono">{d.bookingRef || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                    <p className="text-[11px] text-slate-400 mb-1">ACCIDENTAL / DISPUTE</p>
+                    <p className="text-xs text-slate-300">
+                      Direct user to support center with Ref <span className="text-white font-mono">{d.bookingRef}</span>
+                    </p>
+                  </div>
+                  <Link 
+                    to="/events" 
+                    className="flex items-center justify-center gap-2 p-3 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg border border-indigo-500/30 text-indigo-400 text-xs font-semibold transition-colors"
+                  >
+                    <ArrowTopRightOnSquareIcon className="w-4 h-4" />
+                    Assist with Rebooking
+                  </Link>
+                </div>
               </div>
             )}
 
