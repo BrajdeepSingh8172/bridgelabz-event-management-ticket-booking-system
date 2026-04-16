@@ -66,8 +66,7 @@ export default function Login() {
   };
 
   // ✅ FIXED GOOGLE URL
-  const googleUrl = `${import.meta.env.VITE_API_URL}/api/v1/auth/google`;
-
+  const googleUrl = `${import.meta.env.VITE_API_URL}/api/auth/google`;
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-hero-glow bg-surface">
       <div className="w-full max-w-md animate-slide-up">
