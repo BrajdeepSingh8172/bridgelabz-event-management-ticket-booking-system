@@ -56,6 +56,11 @@ app.get('/health', (_req, res) =>
   res.json({ success: true, message: 'Server is healthy', timestamp: new Date().toISOString() })
 );
 
+// Root route
+app.get('/', (_req, res) => {
+  res.json({ success: true, message: 'Welcome to the Event Management API' });
+});
+
 // 404 for unmatched routes
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
