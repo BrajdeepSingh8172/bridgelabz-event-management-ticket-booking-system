@@ -17,7 +17,7 @@ export function useAuth() {
   const [logoutApi] = useLogoutMutation();
 
   const logout = async () => {
-    try { await logoutApi().unwrap(); } catch (_) { /* ignore */ }
+    try { await logoutApi().unwrap(); } catch { /* ignore */ }
     dispatch(logoutAction());
     navigate('/login');
   };

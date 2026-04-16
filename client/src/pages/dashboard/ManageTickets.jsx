@@ -31,7 +31,7 @@ export default function ManageTickets() {
       // ApiResponse shape: { success, data: [...tickets], message }
       const raw = res.data?.data ?? res.data;
       setTickets(Array.isArray(raw) ? raw : []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load tickets');
     } finally {
       setIsLoadingTickets(false);

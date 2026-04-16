@@ -28,7 +28,7 @@ export default function BookingCard({ booking, onRequestCancel, onDirectCancel, 
   const isPending    = booking?.status === 'pending';
   const isConfirmed  = booking?.status === 'confirmed';
   const isCancelled  = booking?.status === 'cancelled';
-  const isRefunded   = booking?.status === 'refunded';
+
 
   const isCancelRequested = booking?.cancellationStatus === 'requested';
   const isCancelApproved  = booking?.cancellationStatus === 'approved';

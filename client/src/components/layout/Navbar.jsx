@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -19,7 +19,6 @@ const navLinks = [
 
 export default function Navbar() {
   const { user, isAuth, isOrganizer, isAdmin, logout } = useAuth();
-  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled,   setScrolled]   = useState(false);
 

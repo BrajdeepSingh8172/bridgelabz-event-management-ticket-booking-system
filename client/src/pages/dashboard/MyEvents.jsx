@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useGetEventsQuery, useDeleteEventMutation } from '../../features/events/eventsApi';
-import { useAuth }   from '../../hooks/useAuth';
+
 import Badge   from '../../components/ui/Badge';
 import Button  from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';

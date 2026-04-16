@@ -42,12 +42,12 @@ export default function EventDetail() {
   const handleBook = () => {
     if (!isAuth) {
       // Save selections so they survive the login redirect
-      try { sessionStorage.setItem(`sel_${id}`, JSON.stringify(selections)); } catch (_) {}
+      try { sessionStorage.setItem(`sel_${id}`, JSON.stringify(selections)); } catch { /* ignore */ }
       navigate(`/login?next=/events/${id}`);
       return;
     }
     // Clear saved selections once we navigate to checkout
-    try { sessionStorage.removeItem(`sel_${id}`); } catch (_) {}
+    try { sessionStorage.removeItem(`sel_${id}`); } catch { /* ignore */ }
     navigate(`/checkout/${id}`, { state: { selections, event } });
   };
 

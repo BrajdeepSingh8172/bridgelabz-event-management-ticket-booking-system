@@ -14,7 +14,7 @@ export default function ManageUsers() {
       // ApiResponse shape: { success, data: { users, pagination }, message }
       const raw = data?.data ?? data;
       setUsers(raw?.users ?? (Array.isArray(raw) ? raw : []));
-    } catch (err) {
+    } catch {
       toast.error('Failed to load users');
     } finally {
       setLoading(false);

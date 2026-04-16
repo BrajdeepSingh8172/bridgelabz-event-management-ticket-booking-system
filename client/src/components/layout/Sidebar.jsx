@@ -29,7 +29,7 @@ const staticAdminLinks = [
 ];
 
 export default function Sidebar({ onClose }) {
-  const { isAdmin, isOrganizer } = useAuth();
+  const { isAdmin } = useAuth();
 
   // Fetch pending cancellations count for admin badge (skip if not admin)
   const { data: pendingRequests } = useGetPendingCancellationsQuery(undefined, {

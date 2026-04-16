@@ -155,7 +155,7 @@ export default function QRScanner() {
         (decodedText) => {
           handleValidation(decodedText);
         },
-        (errorMessage) => {
+        () => {
           // silent error for frame-swiping
         }
       );

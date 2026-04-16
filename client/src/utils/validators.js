@@ -41,7 +41,7 @@ export const checkoutSchema = z.object({
     .string()
     .optional()
     .refine(
-      (v) => !v || v.trim() === '' || /^[+\d][\d\s\-]{7,14}$/.test(v.trim()),
+      (v) => !v || v.trim() === '' || /^[+\d][\d\s-]{7,14}$/.test(v.trim()),
       { message: 'Enter a valid phone number' }
     ),
 });
