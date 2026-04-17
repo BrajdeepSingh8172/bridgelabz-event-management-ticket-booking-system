@@ -39,6 +39,10 @@ Traditional event management relies on manual registration and physical ticket d
 - **Admins** can oversee the entire platform — users, revenue, analytics, and bookings
 
 ---
+## 🌍 Live Demo
+
+🎟️ **Sample Event Page:**  
+https://bridgelabz-event-management-ticket-7f3p.onrender.com/
 
 ## ✨ Features
 
