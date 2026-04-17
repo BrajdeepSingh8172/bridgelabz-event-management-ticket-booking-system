@@ -22,4 +22,4 @@ const makeAdmin = async () => {
   }
 };
 
-makeAdmin();
+makeAdmin(); // Run this file with `node makeAdmin.js` to update the user role to admin.
