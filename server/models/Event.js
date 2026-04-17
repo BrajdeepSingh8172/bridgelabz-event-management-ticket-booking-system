@@ -88,5 +88,5 @@ eventSchema.index({ 'venue.city': 1 });
 eventSchema.index({ isFeatured: 1 });
 eventSchema.index({ organizer: 1 });
 
-const Event = mongoose.model('Event', eventSchema);
+const Event = mongoose.model('Event', eventSchema);// For testing purposes, we export the schema as well
 module.exports = Event;

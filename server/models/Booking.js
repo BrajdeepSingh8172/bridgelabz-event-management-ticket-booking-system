@@ -106,5 +106,5 @@ bookingSchema.pre('validate', function (next) {
   next();
 });
 
-const Booking = mongoose.model('Booking', bookingSchema);
+const Booking = mongoose.model('Booking', bookingSchema);// For testing purposes, we export the schema as well
 module.exports = Booking;
