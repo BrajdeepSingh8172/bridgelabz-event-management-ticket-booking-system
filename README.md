@@ -305,7 +305,8 @@ event-management-ticket-booking/
 | Brajdeep Singh | 2415990013 |
 | Tanishq Vashishtha | 2315002286 |
 | Shubham Chaudhary | 2315002138 |
-
+| Siddharth Sharma | 2315002166 |
+| Skand Rawat | 2315002171 |
 
 
 
