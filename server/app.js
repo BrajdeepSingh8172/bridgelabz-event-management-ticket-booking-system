@@ -19,6 +19,10 @@ const apiRouter = require('./routes/index');
 
 const app = express();
 
+// Trust proxy is required when deploying behind a load balancer (like Render)
+// so that req.ip and req.secure report correctly for rate limiting and cookies.
+app.set('trust proxy', 1);
+
 // ── Security / Infra middleware ───────────────────────────────────────────────
 app.use(helmet());
 

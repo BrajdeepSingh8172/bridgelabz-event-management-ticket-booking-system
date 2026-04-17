@@ -46,7 +46,8 @@ export default function Register() {
     }
   };
 
-  const googleUrl = `${import.meta.env.VITE_API_URL}/api/auth/google`;
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+  const googleUrl = `${baseUrl}/api/auth/google`;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-hero-glow bg-surface">
