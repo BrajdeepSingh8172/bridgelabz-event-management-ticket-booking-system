@@ -17,9 +17,9 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const apiRouter = require('./routes/index');
 
-const app = express();// Create Express app
+const app = express();// Create Express app 
 // ── Security / Infra middleware ───────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet());// Set security-related HTTP headers
 
 app.use(
   cors({
