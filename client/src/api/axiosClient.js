@@ -7,10 +7,10 @@ const axiosClient = axios.create({
   withCredentials: true,
 });
 
-// ── Request interceptor: attach Bearer token ─────────────────────────────────
+// Request interceptor
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    const token = store.getState().auth.accessToken;
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -19,14 +19,14 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// ── Response interceptor: silent refresh on 401 ──────────────────────────────
+// Response interceptor
 let isRefreshing = false;
-let failedQueue  = [];
+let failedQueue = [];
 
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
     if (error) prom.reject(error);
-    else       prom.resolve(token);
+    else prom.resolve(token);
   });
   failedQueue = [];
 };
@@ -52,11 +52,14 @@ axiosClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await axiosClient.post('/api/auth/refresh-token');
+        const { data } = await axiosClient.post('/api/auth/refresh');
         const newToken = data?.data?.accessToken || data?.accessToken;
+
         store.dispatch(setCredentials({ accessToken: newToken }));
+
         processQueue(null, newToken);
         originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+
         return axiosClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
