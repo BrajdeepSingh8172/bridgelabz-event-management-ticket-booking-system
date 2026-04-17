@@ -14,6 +14,7 @@ const makeAdmin = async () => {
       { $set: { role: 'admin' } }
     );
     
+    
     console.log(`Updated user:`, res);
   } catch (err) {
     console.error(err);
