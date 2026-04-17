@@ -8,7 +8,7 @@ const app = require('./app');
 const connectDB = require('./config/db');
 const { connectRedis } = require('./config/redis');
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000;// default to 5000 if not specified in .env
 
 // ── HTTP server + Socket.IO ───────────────────────────────────────────────────
 const httpServer = http.createServer(app);
