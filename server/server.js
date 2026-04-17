@@ -37,6 +37,7 @@ io.on('connection', (socket) => {
 // Attach io instance to app so controllers can emit events
 app.set('io', io);
 
+
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 const start = async () => {
   await connectDB();
