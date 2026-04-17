@@ -10,52 +10,58 @@ const { connectRedis } = require('./config/redis');
 
 const PORT = process.env.PORT || 5000;
 
-// ── HTTP server + Socket.IO ───────────────────────────────────────────────────
+// HTTP server
 const httpServer = http.createServer(app);
 
+// Socket.IO setup
 const io = new SocketServer(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL,
-    methods: ['GET', 'POST'],
+    origin: process.env.CLIENT_URL || "*",
+    methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
 io.on('connection', (socket) => {
-  console.log(`🔌  Socket connected: ${socket.id}`);
+  console.log(`🔌 Socket connected: ${socket.id}`);
 
   socket.on('joinEvent', (eventId) => {
     socket.join(`event:${eventId}`);
-    console.log(`   Socket ${socket.id} joined room event:${eventId}`);
+    console.log(`Socket ${socket.id} joined event:${eventId}`);
   });
 
   socket.on('disconnect', () => {
-    console.log(`🔌  Socket disconnected: ${socket.id}`);
+    console.log(`🔌 Socket disconnected: ${socket.id}`);
   });
 });
 
-// Attach io instance to app so controllers can emit events
+// attach io
 app.set('io', io);
 
-// ── Bootstrap ────────────────────────────────────────────────────────────────
+// start server
 const start = async () => {
   await connectDB();
-  connectRedis(); // non-blocking — server starts even if Redis is down
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀  Server running on port ${PORT} [${process.env.NODE_ENV}]`);
+  try {
+    connectRedis();
+  } catch (err) {
+    console.log("Redis not connected (optional)");
+  }
+
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
   });
 };
 
 start();
 
-// ── Graceful shutdown ────────────────────────────────────────────────────────
+// graceful shutdown
 process.on('unhandledRejection', (err) => {
-  console.error('💥  Unhandled Rejection:', err);
+  console.error('💥 Unhandled Rejection:', err);
   httpServer.close(() => process.exit(1));
 });
 
 process.on('SIGTERM', () => {
-  console.log('👋  SIGTERM received — shutting down gracefully');
+  console.log('👋 SIGTERM received — shutting down');
   httpServer.close(() => process.exit(0));
 });
