@@ -23,7 +23,6 @@ A full-stack web application for managing events, ticket sales, and booking oper
 - [Tech Stack](#-tech-stack)
 - [System Architecture](#-system-architecture)
 - [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
 - [API Endpoints](#-api-endpoints)
 - [Project Structure](#-project-structure)
 - [User Roles](#-user-roles)
@@ -159,39 +158,6 @@ npm start
 The frontend will run on `http://localhost:3000` and the backend on `http://localhost:5000`.
 
 ---
-
-## 🔑 Environment Variables
-
-Create a `.env` file inside the `/server` directory:
-
-```env
-# Server
-PORT=5000
-NODE_ENV=development
-
-# MongoDB
-MONGO_URI=your_mongodb_atlas_connection_string
-
-# JWT
-JWT_ACCESS_SECRET=your_access_token_secret
-JWT_REFRESH_SECRET=your_refresh_token_secret
-JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
-
-# Razorpay
-RAZORPAY_KEY_ID=your_razorpay_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_key_secret
-RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
-
-# Email (Nodemailer)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASS=your_app_password
-
-# Client
-CLIENT_URL=http://localhost:3000
-```
 
 > ⚠️ Never commit your `.env` file. It is already listed in `.gitignore`.
 
