@@ -29,6 +29,15 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
+// ── Middleware: Validate CLIENT_URL on OAuth routes ────────────────────────────
+const validateOAuthEnvironment = (req, res, next) => {
+  if (!process.env.CLIENT_URL) {
+    console.error('❌ CLIENT_URL environment variable is not set');
+    return res.status(500).json({ success: false, message: 'Server misconfiguration' });
+  }
+  next();
+};
+
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 // GET /api/auth/google
 router.get(
@@ -37,9 +46,20 @@ router.get(
 );
 
 // GET /api/auth/google/callback
+// ✅ Dynamic redirect instead of hardcoded template literal
 router.get(
   '/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login?error=oauth_failed` }),
+  validateOAuthEnvironment,
+  passport.authenticate('google', { session: false }),
+  (req, res, next) => {
+    // Handle failure scenario (user cancelled or error)
+    if (!req.user) {
+      const failureUrl = `${process.env.CLIENT_URL}/login?error=oauth_failed`;
+      return res.redirect(failureUrl);
+    }
+    // Success: call googleCallback
+    next();
+  },
   googleCallback
 );
 
