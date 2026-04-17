@@ -122,14 +122,24 @@ const refreshToken = async (req, res) => {
 
 // ── GET /api/auth/google/callback ─────────────────────────────────────────────
 // Called AFTER passport.authenticate succeeds — req.user is the Mongoose doc
+// Redirects to frontend with access token
 const googleCallback = async (req, res) => {
   const user = req.user;
   if (!user) throw new ApiError(401, 'Google authentication failed');
 
+  // Validate CLIENT_URL is set
+  if (!process.env.CLIENT_URL) {
+    console.error('❌ CLIENT_URL environment variable is not set');
+    throw new ApiError(500, 'Server configuration error');
+  }
+
   const accessToken = await issueTokens(user, res);
 
-  // Browser redirect — NOT JSON
-  res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${accessToken}`);
+  // ✅ Redirect to production frontend with token
+  // Example: https://bridgelabz-event-management-ticket-7f3p.onrender.com/auth/callback?token=...
+  const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?token=${accessToken}`;
+  console.log(`✅ Google OAuth successful. Redirecting to: ${redirectUrl.split('?')[0]}`);
+  res.redirect(redirectUrl);
 };
 
 module.exports = { register, login, logout, refreshToken, googleCallback };

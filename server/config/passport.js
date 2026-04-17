@@ -1,12 +1,23 @@
 const passport = require('passport');
 const User = require('../models/User');
 
-if (
-  process.env.GOOGLE_CLIENT_ID &&
-  process.env.GOOGLE_CLIENT_ID !== 'your_google_client_id.apps.googleusercontent.com' &&
-  process.env.GOOGLE_CLIENT_SECRET &&
-  process.env.GOOGLE_CLIENT_SECRET !== 'your_google_client_secret'
-) {
+// Validate environment variables
+const validateGoogleOAuthConfig = () => {
+  const required = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CALLBACK_URL'];
+  const missing = required.filter(key => 
+    !process.env[key] || 
+    process.env[key].includes('your_') || 
+    process.env[key].includes('localhost')
+  );
+  
+  if (missing.length > 0) {
+    console.warn(`⚠️  Google OAuth will not work. Missing or invalid config: ${missing.join(', ')}`);
+    return false;
+  }
+  return true;
+};
+
+if (validateGoogleOAuthConfig()) {
   const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 
   passport.use(
@@ -14,6 +25,8 @@ if (
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        // ✅ Use full production callback URL from environment
+        // Example: https://bridgelabz-event-management-ticket-n409.onrender.com/api/auth/google/callback
         callbackURL: process.env.GOOGLE_CALLBACK_URL,
       },
       async (_accessToken, _refreshToken, profile, done) => {
@@ -60,7 +73,7 @@ if (
 
   console.log('✅ Google OAuth strategy loaded');
 } else {
-  console.log('⚠️  Google OAuth skipped — credentials not set');
+  console.log('⚠️  Google OAuth skipped — credentials not set or invalid');
 }
 
 module.exports = passport;

@@ -19,6 +19,31 @@ const apiRouter = require('./routes/index');
 
 const app = express();
 
+// ── Environment Validation ─────────────────────────────────────────────────────
+// Validate OAuth configuration at startup
+const validateOAuthConfig = () => {
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.CLIENT_URL || process.env.CLIENT_URL.includes('localhost')) {
+      console.error('❌ Production Error: CLIENT_URL must be set to production frontend URL');
+      console.error(`   Current: ${process.env.CLIENT_URL || 'undefined'}`);
+    }
+    if (!process.env.GOOGLE_CALLBACK_URL || process.env.GOOGLE_CALLBACK_URL.includes('localhost')) {
+      console.error('❌ Production Error: GOOGLE_CALLBACK_URL must be set to production backend URL');
+      console.error(`   Current: ${process.env.GOOGLE_CALLBACK_URL || 'undefined'}`);
+    }
+  }
+
+  // Log configuration (without revealing secrets)
+  if (process.env.CLIENT_URL) {
+    console.log(`✅ Frontend URL: ${process.env.CLIENT_URL}`);
+  }
+  if (process.env.GOOGLE_CALLBACK_URL) {
+    console.log(`✅ OAuth Callback: ${process.env.GOOGLE_CALLBACK_URL}`);
+  }
+};
+
+validateOAuthConfig();
+
 // Trust proxy is required when deploying behind a load balancer (like Render)
 // so that req.ip and req.secure report correctly for rate limiting and cookies.
 app.set('trust proxy', 1);
